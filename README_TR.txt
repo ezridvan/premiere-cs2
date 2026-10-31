@@ -1,11 +1,13 @@
-CS2 Player Overlay v1.1.0 — Premiere Pro 25.6+ / UXP
+CS2 Player Overlay v1.1.1 — Premiere Pro 25.6+ / UXP
 
 Kurulum
 - Bu klasördeki manifest.json dosyasını UXP Developer Tool ile ekleyip Load/Reload yapın.
 - overlay-effects.js ve numeric-control.js, main.js ile aynı klasörde bulunmalı.
 - Eklenti kimliği değişmediği için mevcut oyuncu kütüphanesi korunur.
 
-Ayar alanları (v1.1.0)
+Ayar alanları (v1.1.1)
+- Position X ve Y aralığı -100000 ile +100000 olarak genişletildi.
+  Örneğin X alanına 6000 yazıp Ayarları Kaydet ile saklayabilirsiniz.
 - Artı/eksi düğmeleri kaldırıldı. Sayıya tıklayıp doğrudan değer yazabilirsiniz.
 - Sayı veya ayar başlığı üzerinde sağa/sola sürüklemek değeri değiştirir.
 - Shift: 10 kat hızlı; Alt: 10 kat hassas. Ondalık ayıracı olarak virgül de kabul edilir.
