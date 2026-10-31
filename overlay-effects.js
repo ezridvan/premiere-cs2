@@ -16,13 +16,16 @@ function animationKeys(inPoint, outPoint, frameSeconds, player, size) {
   const end = outPoint - frameSeconds;
   const span = end - inPoint;
   if (!(span > 0)) throw new Error('Animasyon için klip en az iki kare olmalı.');
-  // Trial timing: remove 26 entrance + 26 exit sequence frames (52 total).
-  // Keep at least one frame per side at low frame rates.
-  const enterSeconds = Math.max(frameSeconds, IN_SECONDS - 26 * frameSeconds);
-  const exitSeconds = Math.max(frameSeconds, OUT_SECONDS - 26 * frameSeconds);
-  const ratio = Math.min(1, span / (enterSeconds + exitSeconds));
-  const enterEnd = inPoint + enterSeconds * ratio;
-  const exitStart = end - exitSeconds * ratio;
+  const ratio = Math.min(1, span / (IN_SECONDS + OUT_SECONDS));
+  const enterEnd = inPoint + IN_SECONDS * ratio;
+  const exitStart = end - OUT_SECONDS * ratio;
+  // Distance is independent of duration and the player's resting Position X.
+  // Missing values in existing libraries use the new half-distance default.
+  const percentage = player.slideDistance === undefined ? 50 : player.slideDistance;
+  if (!Number.isFinite(percentage) || percentage < 0 || percentage > 200) {
+    throw new Error('Kayma mesafesi 0 ile 200 arasında olmalı.');
+  }
+  const offset = OFFSET * percentage / 100;
   const x = player.x / size.width, y = player.y / size.height;
   const keys = [];
   // UXP exposes interpolation modes but not the preset's temporal/spatial
@@ -38,8 +41,8 @@ function animationKeys(inPoint, outPoint, frameSeconds, player, size) {
       keys.push(point);
     }
   }
-  segment(inPoint, enterEnd, x + OFFSET, x);
-  segment(Math.max(enterEnd, exitStart), end, x, x + OFFSET);
+  segment(inPoint, enterEnd, x + offset, x);
+  segment(Math.max(enterEnd, exitStart), end, x, x + offset);
   return keys;
 }
 
