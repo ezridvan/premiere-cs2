@@ -5,7 +5,7 @@ const player = {id:'a', name:'Player', x:960, y:540, scale:80, rotation:10, opac
 const size = {width:1920, height:1080};
 const near=(a,b)=>assert.ok(Math.abs(a-b)<1e-8, `${a} != ${b}`);
 
-test('source anchors and hold keep original timing while default travel is halved',()=>{
+test('source anchors and hold use configured timing while default travel is halved',()=>{
   const keys=animationKeys(17,27,1/25,player,size);
   near(keys[0].time,17);near(keys.at(-1).time,26.96);
   near(keys[0].x,.5+(1.5104166269302368-.5)/2);near(keys.at(-1).x,keys[0].x);
@@ -193,4 +193,19 @@ test('all native temporal interpolation actions use BEZIER rather than LINEAR',a
   const param=f.state.components[0].getParam(1);
   assert.equal(param.interpolation.size,param.keys.size);
   assert.ok([...param.interpolation.values()].every(mode=>mode===5));
+});
+
+
+test('entrance arrives in 44/50 of the previous duration without changing endpoints or exit timing',()=>{
+  for(const fps of [25,30,60]){
+    const keys=animationKeys(10,20,1/fps,player,size);
+    const landing=keys.find(k=>Math.abs(k.x-.5)<1e-8);
+    near(landing.time-10,.85*44/50);
+    near(keys[0].time,10);
+    near(keys[0].x,.5+(1.5104166269302368-.5)/2);
+    near(keys.at(-1).time,20-1/fps);
+    near(keys.at(-1).x,keys[0].x);
+    const hold=keys.filter(k=>Math.abs(k.x-.5)<1e-8);
+    near(hold.at(-1).time,20-1/fps-(3678998400000-3458145600000)/254016000000);
+  }
 });

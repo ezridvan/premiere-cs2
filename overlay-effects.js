@@ -2,7 +2,8 @@
 const TICKS = 254016000000;
 const MATCH = 'AE.ADBE Geometry2';
 const TAG = / \[CS2:([^\]]+)\]$/;
-const IN_SECONDS = 215913600000 / TICKS;
+// Match the requested arrival timing ratio: 44 instead of 50 (12% shorter).
+const IN_SECONDS = (215913600000 / TICKS) * (44 / 50);
 const OUT_SECONDS = (3678998400000 - 3458145600000) / TICKS;
 const OFFSET = 1.5104166269302368 - 0.5;
 
