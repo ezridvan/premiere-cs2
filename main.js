@@ -1,10 +1,12 @@
 const {entrypoints,storage}=require('uxp');
 let effectTimer=null;
-entrypoints.setup({panels:{playerPanel:{show(){startEffectTracking()},destroy(){stopEffectTracking()}}}});
+entrypoints.setup({panels:{playerPanel:{show(){startEffectTracking()},destroy(){stopEffectTracking();numericControls.forEach(c=>c.stop())}}}});
 const fs=storage.localFileSystem;
 const ppro=require('premierepro');
 const {createEffects}=require('./overlay-effects.js');
 const effects=createEffects(ppro);
+const {bindNumericControl}=require('./numeric-control.js');
+const numericControls=[];
 let effectError='';
 const $=id=>document.getElementById(id);
 let players=[],selected=null,tab='favorites';
@@ -15,12 +17,23 @@ function make(tag,cls,txt){const n=document.createElement(tag);if(cls)n.classNam
 async function saveDB(){const dir=await fs.getDataFolder();const f=await dir.createFile('players.json',{overwrite:true});await f.write(JSON.stringify(players));}
 async function loadDB(){try{const dir=await fs.getDataFolder();const f=await dir.getEntry('players.json');const data=JSON.parse(await f.read());players=Array.isArray(data)?data:[]}catch(e){players=[]}render();status(players.length+' oyuncu hazır.')}
 function render(){const grid=$('grid');while(grid.firstChild)grid.removeChild(grid.firstChild);const q=String($('search').value||'').trim().toLowerCase();const shown=players.filter(p=>(tab==='all'||p.fav)&&String(p.name||'').toLowerCase().includes(q));$('count').textContent=shown.length+' oyuncu gösteriliyor · Toplam '+players.length;$('empty').textContent=shown.length?'':'Burada henüz oyuncu yok.';shown.forEach(p=>{const card=make('div','card');const src=p.preview||p.src;if(src){const img=make('img','thumb');img.src=src;card.appendChild(img)}else card.appendChild(make('div','thumb','PNG yok'));card.appendChild(make('div','name',p.name));const actions=make('div','cardactions');const star=make('button','',p.fav?'★':'☆');star.onclick=async e=>{e.stopPropagation();p.fav=!p.fav;await saveDB();render()};const edit=make('button','','⚙');edit.onclick=e=>{e.stopPropagation();choose(p.id)};star.title='Favori';edit.title='Ayarlar';actions.appendChild(star);actions.appendChild(edit);card.appendChild(actions);card.ondblclick=()=>insertPlayer(p);grid.appendChild(card)})}
-function makeFields(){const wrap=$('fields');specs.forEach(([key,label,min,max])=>{const f=make('div','field'),l=make('div','fieldlabel',label),actions=make('div','stepper'),v=make('div','editable num'),minus=make('button','','−'),plus=make('button','','+');v.id='val-'+key;v.setAttribute('contenteditable','true');v.setAttribute('spellcheck','false');const increment=key==='scale'?5:key==='x'||key==='y'?20:key==='rotation'?1:5;function adjust(d){let n=Number(v.textContent.trim().replace(',','.'));if(!Number.isFinite(n))n=defaults[key];v.textContent=String(Math.max(min,Math.min(max,n+d)))}minus.onclick=()=>adjust(-increment);plus.onclick=()=>adjust(increment);actions.appendChild(minus);actions.appendChild(v);actions.appendChild(plus);f.appendChild(l);f.appendChild(actions);wrap.appendChild(f)})}
-function showSettings(on){$('library').className=on?'hidden':'';$('settings').className=on?'':'hidden';$('heading').textContent=on?'Oyuncu ayarları':'Oyuncu kütüphanesi';$('add').style.display=on?'none':'block';$('body').scrollTop=0}
+function makeFields(){
+  const wrap=$('fields');
+  specs.forEach(([key,label,min,max,step])=>{
+    const row=make('div','field numeric-row');
+    const caption=make('div','fieldlabel scrub-label',label);
+    const value=make('div','numeric-value',String(defaults[key]));
+    value.id='val-'+key;
+    row.appendChild(caption);row.appendChild(value);wrap.appendChild(row);
+    numericControls.push(bindNumericControl(value,caption,document,
+      {label,min,max,step,fallback:defaults[key]}));
+  });
+}
+function showSettings(on){numericControls.forEach(c=>{c.stop();c.commit()});$('library').className=on?'hidden':'';$('settings').className=on?'':'hidden';$('heading').textContent=on?'Oyuncu ayarları':'Oyuncu kütüphanesi';$('add').style.display=on?'none':'block';$('body').scrollTop=0}
 function choose(id){selected=id;const p=players.find(x=>x.id===id);if(!p)return;$('playerName').textContent=p.name||'';const src=p.preview||p.src;$('preview').style.display=src?'block':'none';if(src)$('preview').src=src;specs.forEach(([key])=>{$('val-'+key).textContent=String(p[key]===undefined?defaults[key]:p[key])});showSettings(true)}
 $('back').onclick=()=>{showSettings(false);render()};$('favtab').onclick=()=>{tab='favorites';$('favtab').className='active';$('alltab').className='';render()};$('alltab').onclick=()=>{tab='all';$('alltab').className='active';$('favtab').className='';render()};$('search').oninput=render;$('search').addEventListener('input',render);$('search').addEventListener('change',render);$('clearSearch').onclick=()=>{$('search').value='';render()};
-$('save').onclick=async()=>{const p=players.find(x=>x.id===selected);if(!p)return status('Oyuncu seç.');const name=$('playerName').textContent.trim();if(!name)return status('Oyuncu adı boş olamaz.');if(players.some(x=>x!==p&&x.name.toLowerCase()===name.toLowerCase()))return status('Bu isim zaten kullanılıyor.');const values={};for(const [key,,min,max] of specs){const n=Number($('val-'+key).textContent.trim().replace(',','.'));if(!Number.isFinite(n)||n<min||n>max)return status('Geçersiz değer: '+key);values[key]=n}Object.assign(p,values);p.name=name;try{await saveDB();status(name+' kaydedildi.');showSettings(false);render()}catch(e){status('Kayıt hatası: '+e.message)}};
-$('reset').onclick=()=>{specs.forEach(([key])=>{$('val-'+key).textContent=String(defaults[key])});status('Varsayılan değerler yüklendi. Kaydet ile onayla.')};
+$('save').onclick=async()=>{numericControls.forEach(c=>c.commit());const p=players.find(x=>x.id===selected);if(!p)return status('Oyuncu seç.');const name=$('playerName').textContent.trim();if(!name)return status('Oyuncu adı boş olamaz.');if(players.some(x=>x!==p&&x.name.toLowerCase()===name.toLowerCase()))return status('Bu isim zaten kullanılıyor.');const values={};for(const [key,,min,max] of specs){const n=Number($('val-'+key).textContent.trim().replace(',','.'));if(!Number.isFinite(n)||n<min||n>max)return status('Geçersiz değer: '+key);values[key]=n}Object.assign(p,values);p.name=name;try{await saveDB();status(name+' kaydedildi.');showSettings(false);render()}catch(e){status('Kayıt hatası: '+e.message)}};
+$('reset').onclick=()=>{numericControls.forEach(c=>{c.stop();c.commit()});specs.forEach(([key])=>{$('val-'+key).textContent=String(defaults[key])});status('Varsayılan değerler yüklendi. Kaydet ile onayla.')};
 $('remove').onclick=async()=>{if(selected===null)return;players=players.filter(p=>p.id!==selected);selected=null;await saveDB();showSettings(false);render();status('Oyuncu silindi.')};
 $('add').onclick=async()=>{try{const file=await fs.getFileForOpening({types:['png']});if(!file)return;const name=file.name.replace(/\.png$/i,'');if(players.some(p=>p.name.toLowerCase()===name.toLowerCase()))return status('Bu isim zaten var: '+name);
 const bytes=await file.read({format:storage.formats.binary});const u8=new Uint8Array(bytes);let bin='';for(let i=0;i<u8.length;i+=8192)bin+=String.fromCharCode.apply(null,u8.subarray(i,i+8192));

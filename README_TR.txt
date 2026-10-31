@@ -1,9 +1,17 @@
-CS2 Player Overlay v1.0.1 — Premiere Pro 25.6+ / UXP
+CS2 Player Overlay v1.1.0 — Premiere Pro 25.6+ / UXP
 
 Kurulum
 - Bu klasördeki manifest.json dosyasını UXP Developer Tool ile ekleyip Load/Reload yapın.
-- Yeni dosya overlay-effects.js de main.js ile aynı klasörde bulunmalı.
+- overlay-effects.js ve numeric-control.js, main.js ile aynı klasörde bulunmalı.
 - Eklenti kimliği değişmediği için mevcut oyuncu kütüphanesi korunur.
+
+Ayar alanları (v1.1.0)
+- Artı/eksi düğmeleri kaldırıldı. Sayıya tıklayıp doğrudan değer yazabilirsiniz.
+- Sayı veya ayar başlığı üzerinde sağa/sola sürüklemek değeri değiştirir.
+- Shift: 10 kat hızlı; Alt: 10 kat hassas. Ondalık ayıracı olarak virgül de kabul edilir.
+- Enter yazmayı onaylar; Esc yazmaya başlamadan önceki değere döner.
+- Boş/geçersiz giriş son geçerli değere döner; sınırlar dışındaki değerler sınırlanır.
+- Klavyede yukarı/aşağı okları da kullanılabilir. Ayarları Kaydet ile saklayın.
 
 Kullanım
 - Oyuncuya çift tıklama PNG'yi timeline'a ekler ve Transform animasyonunu uygular.
@@ -40,4 +48,4 @@ Masaüstü kontrolü
 5. Farklı sequence'e geçin, geri dönün; ilgisiz kliplerde değişiklik olmadığını doğrulayın.
 
 Bulut kontrolleri: node --check main.js; node --check overlay-effects.js;
-node tests/overlay-effects.test.js
+node tests/overlay-effects.test.js; node tests/numeric-control.test.js
