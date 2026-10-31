@@ -94,7 +94,7 @@ test('real action sequence creates Transform, configures player values and motio
   assert.equal(effect.getParam(7).constant,10);
   assert.equal(effect.getParam(8).constant,90);
   assert.equal(effect.getParam(9).constant,false);
-  assert.equal(effect.getParam(10).constant,360);
+  assert.equal(effect.getParam(10).constant,90);
   near(Math.min(...effect.getParam(1).keys.keys()),10);
   near(Math.max(...effect.getParam(1).keys.keys()),14.96);
   assert.equal(f.state.name,clipName(player));
@@ -172,4 +172,16 @@ test('zero travel remains stationary and invalid distances are rejected',()=>{
   const keys=animationKeys(0,5,.04,{...player,slideDistance:0},size);
   assert.ok(keys.every(k=>k.x===.5&&k.y===.5));
   for(const slideDistance of [-1,201,NaN])assert.throws(()=>animationKeys(0,5,.04,{...player,slideDistance},size),/Kayma mesafesi/);
+});
+
+
+test('entrance starts fast and decelerates monotonically to the unchanged destination',()=>{
+  const keys=animationKeys(0,5,.04,player,size);
+  const enter=keys.filter(k=>k.time<=IN_SECONDS+1e-8);
+  const moves=enter.slice(1).map((k,i)=>Math.abs(k.x-enter[i].x));
+  assert.ok(moves[0]>moves.at(-1)*10);
+  for(let i=1;i<moves.length;i++)assert.ok(moves[i]<moves[i-1]);
+  near(enter.at(-1).x,player.x/size.width);
+  near(enter.at(-1).time,IN_SECONDS);
+  assert.ok(enter.every(k=>k.y===player.y/size.height));
 });

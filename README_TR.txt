@@ -1,11 +1,18 @@
-CS2 Player Overlay v1.3.0 — Premiere Pro 25.6+ / UXP
+CS2 Player Overlay v1.3.1 — Premiere Pro 25.6+ / UXP
 
 Kurulum
 - Bu klasördeki manifest.json dosyasını UXP Developer Tool ile ekleyip Load/Reload yapın.
 - overlay-effects.js, numeric-control.js ve player-colors.js, main.js ile aynı klasörde bulunmalı.
 - Eklenti kimliği değişmediği için mevcut oyuncu kütüphanesi korunur.
 
-Oyuncu renkleri (v1.3.0)
+Animasyon (v1.3.1)
+- Giriş hızlı başlar, duracağı konuma yaklaşırken yavaşlar (cubic ease-out).
+- Giriş süresi ve kayma mesafesi ayarı korunur; çıkışın hız eğrisi değiştirilmedi.
+- Hafif hareket bulanıklığı: Transform shutter angle 90°, composition shutter kapalı.
+- API özel Bézier tutamaçlarını sunmadığı için eğri kare başına örneklenir;
+  UI'daki Temporal Bézier / Spatial Auto Bézier bayraklarının birebir kopyası değildir.
+
+Oyuncu renkleri
 - Ayarlarda beş renkten birini seçip Ayarları Kaydet'e basın.
 - Yellow #fcff00, Blue #8bcef2, Green #169f82, Purple #ba3094, Orange #e18230.
 - Renk oyuncu verisiyle saklanır ve kütüphane kartında gösterilir.
@@ -37,7 +44,7 @@ Kullanım
   panel tekrar açılınca ve ilgili sequence aktif olunca düzeltilir.
 - Takip işareti klibin adındaki [CS2:...] ekidir. Otomatik takip için bu eki koruyun.
   Yönetilen ilk Transform efektini elle sıralamayın/değiştirmeyin; takip bu efekti yönetir.
-- v1.3.0: Kayma mesafesi (%) ayarı eklendi. Varsayılan 50: eski mesafenin yarısı.
+- v1.3.1: Kayma mesafesi (%) ayarı eklendi. Varsayılan 50: eski mesafenin yarısı.
   25 daha kısa, 100 orijinal mesafe, 0 hareketsizdir. Hem giriş hem çıkışa uygulanır.
   Position X fotoğrafın durduğu yeri belirler; kayma mesafesi bu konumu değiştirmez.
 - Önceki denemelerdeki süre kısaltmaları geri alındı. Giriş ~0,85 sn, çıkış ~0,87 sn.
@@ -53,7 +60,7 @@ Preset ayrıntısı ve sınırlar
 - .prfpset doğrudan import edilmez. Geometry2/Transform API ile yeniden oluşturulur.
   UXP özel temporal/spatial Bézier tutamaçlarını sunmadığı için yumuşama kare başına
   örneklenen smoothstep yaklaşımıdır; preset eğrilerinin birebir kopyası değildir.
-- Burada Premiere host bulunmuyor. 13 Node testi zamanlama, kırpma, kısa klip, eski
+- Burada Premiere host bulunmuyor. 14 Node testi zamanlama, kırpma, kısa klip, eski
   keyframe temizliği, efekt işlemleri ve otomatik takibi API taklitleriyle doğrular.
   Gerçek Premiere API davranışı ve render görüntüsü masaüstünde denenmelidir.
 
