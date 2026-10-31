@@ -1,11 +1,23 @@
-CS2 Player Overlay v1.1.1 — Premiere Pro 25.6+ / UXP
+CS2 Player Overlay v1.2.0 — Premiere Pro 25.6+ / UXP
 
 Kurulum
 - Bu klasördeki manifest.json dosyasını UXP Developer Tool ile ekleyip Load/Reload yapın.
-- overlay-effects.js ve numeric-control.js, main.js ile aynı klasörde bulunmalı.
+- overlay-effects.js, numeric-control.js ve player-colors.js, main.js ile aynı klasörde bulunmalı.
 - Eklenti kimliği değişmediği için mevcut oyuncu kütüphanesi korunur.
 
-Ayar alanları (v1.1.1)
+Oyuncu renkleri (v1.2.0)
+- Ayarlarda beş renkten birini seçip Ayarları Kaydet'e basın.
+- Yellow #fcff00, Blue #8bcef2, Green #169f82, Purple #ba3094, Orange #e18230.
+- Renk oyuncu verisiyle saklanır ve kütüphane kartında gösterilir.
+- Yeni oyuncular Yellow ile başlar; eski oyunculara zorunlu bir renk atanmaz.
+- Kaynak PNG'nin ProjectItem label rengi timeline'a eklenmeden önce ayarlanır;
+  yeni timeline klibi bu kaynak label'ını miras alır. Daha önce bağımsız label
+  verilmiş mevcut timeline klipleri yeniden renklendirilmez.
+- Premiere'in mevcut label paleti kullanılır: YELLOW, BLUE, GREEN, PURPLE;
+  Orange için API'deki MANGO yuvası. Özel HEX palet ayarları değiştirilmez.
+- Renk seçimi fotoğraf piksellerine tint/renklendirme efekti uygulamaz.
+
+Ayar alanları
 - Position X ve Y aralığı -100000 ile +100000 olarak genişletildi.
   Örneğin X alanına 6000 yazıp Ayarları Kaydet ile saklayabilirsiniz.
 - Artı/eksi düğmeleri kaldırıldı. Sayıya tıklayıp doğrudan değer yazabilirsiniz.
@@ -47,7 +59,9 @@ Masaüstü kontrolü
    ~2 sn bekleyip iki animasyonun yeni kenarlarda kaldığını kontrol edin.
 3. 1 sn gibi kısa bir klipte ve farklı çözünürlükte deneyin.
 4. Projeyi kaydedip paneli yeniden yükleyin; takibin sürdüğünü kontrol edin.
-5. Farklı sequence'e geçin, geri dönün; ilgisiz kliplerde değişiklik olmadığını doğrulayın.
+5. Her oyuncu rengini kaydedin, paneli yeniden yükleyin ve yeni bir klip ekleyin.
+   Timeline label rengini kontrol edin; klip mirası gerçek Premiere hostunda doğrulanmalı.
+6. Farklı sequence'e geçin, geri dönün; ilgisiz kliplerde değişiklik olmadığını doğrulayın.
 
 Bulut kontrolleri: node --check main.js; node --check overlay-effects.js;
-node tests/overlay-effects.test.js; node tests/numeric-control.test.js
+node tests/overlay-effects.test.js; node tests/numeric-control.test.js; node tests/player-colors.test.js

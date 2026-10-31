@@ -7,16 +7,34 @@ const {createEffects}=require('./overlay-effects.js');
 const effects=createEffects(ppro);
 const {bindNumericControl}=require('./numeric-control.js');
 const numericControls=[];
+const {PLAYER_COLORS,getPlayerColor,applyPlayerLabel}=require('./player-colors.js');
+let selectedColor=null;
 let effectError='';
 const $=id=>document.getElementById(id);
 let players=[],selected=null,tab='favorites';
-const defaults={scale:100,x:960,y:540,rotation:0,opacity:100};
+const defaults={color:'yellow',scale:100,x:960,y:540,rotation:0,opacity:100};
 const specs=[['scale','Scale (%)',10,300,1],['x','Position X',-100000,100000,1],['y','Position Y',-100000,100000,1],['rotation','Rotation (°)',-180,180,1],['opacity','Opacity (%)',0,100,1]];
 function status(s){$('status').textContent=s}
 function make(tag,cls,txt){const n=document.createElement(tag);if(cls)n.className=cls;if(txt!==undefined)n.textContent=txt;return n}
 async function saveDB(){const dir=await fs.getDataFolder();const f=await dir.createFile('players.json',{overwrite:true});await f.write(JSON.stringify(players));}
 async function loadDB(){try{const dir=await fs.getDataFolder();const f=await dir.getEntry('players.json');const data=JSON.parse(await f.read());players=Array.isArray(data)?data:[]}catch(e){players=[]}render();status(players.length+' oyuncu hazır.')}
-function render(){const grid=$('grid');while(grid.firstChild)grid.removeChild(grid.firstChild);const q=String($('search').value||'').trim().toLowerCase();const shown=players.filter(p=>(tab==='all'||p.fav)&&String(p.name||'').toLowerCase().includes(q));$('count').textContent=shown.length+' oyuncu gösteriliyor · Toplam '+players.length;$('empty').textContent=shown.length?'':'Burada henüz oyuncu yok.';shown.forEach(p=>{const card=make('div','card');const src=p.preview||p.src;if(src){const img=make('img','thumb');img.src=src;card.appendChild(img)}else card.appendChild(make('div','thumb','PNG yok'));card.appendChild(make('div','name',p.name));const actions=make('div','cardactions');const star=make('button','',p.fav?'★':'☆');star.onclick=async e=>{e.stopPropagation();p.fav=!p.fav;await saveDB();render()};const edit=make('button','','⚙');edit.onclick=e=>{e.stopPropagation();choose(p.id)};star.title='Favori';edit.title='Ayarlar';actions.appendChild(star);actions.appendChild(edit);card.appendChild(actions);card.ondblclick=()=>insertPlayer(p);grid.appendChild(card)})}
+function render(){const grid=$('grid');while(grid.firstChild)grid.removeChild(grid.firstChild);const q=String($('search').value||'').trim().toLowerCase();const shown=players.filter(p=>(tab==='all'||p.fav)&&String(p.name||'').toLowerCase().includes(q));$('count').textContent=shown.length+' oyuncu gösteriliyor · Toplam '+players.length;$('empty').textContent=shown.length?'':'Burada henüz oyuncu yok.';shown.forEach(p=>{const card=make('div','card');const src=p.preview||p.src;if(src){const img=make('img','thumb');img.src=src;card.appendChild(img)}else card.appendChild(make('div','thumb','PNG yok'));card.appendChild(make('div','name',p.name));const color=getPlayerColor(p.color);if(color){const badge=make('div','player-color-badge',color.name);badge.style.color=color.hex;card.appendChild(badge)}const actions=make('div','cardactions');const star=make('button','',p.fav?'★':'☆');star.onclick=async e=>{e.stopPropagation();p.fav=!p.fav;await saveDB();render()};const edit=make('button','','⚙');edit.onclick=e=>{e.stopPropagation();choose(p.id)};star.title='Favori';edit.title='Ayarlar';actions.appendChild(star);actions.appendChild(edit);card.appendChild(actions);card.ondblclick=()=>insertPlayer(p);grid.appendChild(card)})}
+function renderColorChoices(){
+  const wrap=$('playerColors');
+  while(wrap.firstChild)wrap.removeChild(wrap.firstChild);
+  PLAYER_COLORS.forEach(color=>{
+    const button=make('button','color-choice'+(selectedColor===color.id?' selected':''));
+    button.setAttribute('aria-pressed',String(selectedColor===color.id));
+    button.setAttribute('aria-label',color.name+' '+color.hex);
+    const swatch=make('span','color-swatch');swatch.style.backgroundColor=color.hex;
+    button.appendChild(swatch);button.appendChild(make('span','',color.name));
+    if(selectedColor===color.id)button.appendChild(make('span','',' ✓'));
+    button.title=color.name+' '+color.hex;
+    button.onclick=()=>{selectedColor=color.id;renderColorChoices()};
+    wrap.appendChild(button);
+  });
+  $('selectedColor').textContent=selectedColor?getPlayerColor(selectedColor).name+' · '+getPlayerColor(selectedColor).hex:'Henüz renk atanmadı.';
+}
 function makeFields(){
   const wrap=$('fields');
   specs.forEach(([key,label,min,max,step])=>{
@@ -30,9 +48,9 @@ function makeFields(){
   });
 }
 function showSettings(on){numericControls.forEach(c=>{c.stop();c.commit()});$('library').className=on?'hidden':'';$('settings').className=on?'':'hidden';$('heading').textContent=on?'Oyuncu ayarları':'Oyuncu kütüphanesi';$('add').style.display=on?'none':'block';$('body').scrollTop=0}
-function choose(id){selected=id;const p=players.find(x=>x.id===id);if(!p)return;$('playerName').textContent=p.name||'';const src=p.preview||p.src;$('preview').style.display=src?'block':'none';if(src)$('preview').src=src;specs.forEach(([key])=>{$('val-'+key).textContent=String(p[key]===undefined?defaults[key]:p[key])});showSettings(true)}
+function choose(id){selected=id;const p=players.find(x=>x.id===id);if(!p)return;$('playerName').textContent=p.name||'';selectedColor=getPlayerColor(p.color)?p.color:null;renderColorChoices();const src=p.preview||p.src;$('preview').style.display=src?'block':'none';if(src)$('preview').src=src;specs.forEach(([key])=>{$('val-'+key).textContent=String(p[key]===undefined?defaults[key]:p[key])});showSettings(true)}
 $('back').onclick=()=>{showSettings(false);render()};$('favtab').onclick=()=>{tab='favorites';$('favtab').className='active';$('alltab').className='';render()};$('alltab').onclick=()=>{tab='all';$('alltab').className='active';$('favtab').className='';render()};$('search').oninput=render;$('search').addEventListener('input',render);$('search').addEventListener('change',render);$('clearSearch').onclick=()=>{$('search').value='';render()};
-$('save').onclick=async()=>{numericControls.forEach(c=>c.commit());const p=players.find(x=>x.id===selected);if(!p)return status('Oyuncu seç.');const name=$('playerName').textContent.trim();if(!name)return status('Oyuncu adı boş olamaz.');if(players.some(x=>x!==p&&x.name.toLowerCase()===name.toLowerCase()))return status('Bu isim zaten kullanılıyor.');const values={};for(const [key,,min,max] of specs){const n=Number($('val-'+key).textContent.trim().replace(',','.'));if(!Number.isFinite(n)||n<min||n>max)return status('Geçersiz değer: '+key);values[key]=n}Object.assign(p,values);p.name=name;try{await saveDB();status(name+' kaydedildi.');showSettings(false);render()}catch(e){status('Kayıt hatası: '+e.message)}};
+$('save').onclick=async()=>{numericControls.forEach(c=>c.commit());const p=players.find(x=>x.id===selected);if(!p)return status('Oyuncu seç.');const name=$('playerName').textContent.trim();if(!name)return status('Oyuncu adı boş olamaz.');if(players.some(x=>x!==p&&x.name.toLowerCase()===name.toLowerCase()))return status('Bu isim zaten kullanılıyor.');const values={};for(const [key,,min,max] of specs){const n=Number($('val-'+key).textContent.trim().replace(',','.'));if(!Number.isFinite(n)||n<min||n>max)return status('Geçersiz değer: '+key);values[key]=n}values.color=selectedColor;Object.assign(p,values);p.name=name;try{await saveDB();status(name+' kaydedildi.');showSettings(false);render()}catch(e){status('Kayıt hatası: '+e.message)}};
 $('reset').onclick=()=>{numericControls.forEach(c=>{c.stop();c.commit()});specs.forEach(([key])=>{$('val-'+key).textContent=String(defaults[key])});status('Varsayılan değerler yüklendi. Kaydet ile onayla.')};
 $('remove').onclick=async()=>{if(selected===null)return;players=players.filter(p=>p.id!==selected);selected=null;await saveDB();showSettings(false);render();status('Oyuncu silindi.')};
 $('add').onclick=async()=>{try{const file=await fs.getFileForOpening({types:['png']});if(!file)return;const name=file.name.replace(/\.png$/i,'');if(players.some(p=>p.name.toLowerCase()===name.toLowerCase()))return status('Bu isim zaten var: '+name);
@@ -98,10 +116,19 @@ async function insertPlayer(p){
     status(p.name+': PNG hazırlanıyor...');
     let project=await ppro.Project.getActiveProject();if(!project)throw new Error('Aktif Premiere projesi yok.');
     let sequence=await project.getActiveSequence();if(!sequence)throw new Error('Aktif sequence yok.');
-    const path=await ensurePlayerFile(p);const root=await project.getRootItem();
+    const labelSequence=sequence.guid.toString();
+    const path=await ensurePlayerFile(p);let root=await project.getRootItem();
     let item=await findImported(root,path);
-    if(!item){status(p.name+': Projeye import ediliyor...');const ok=await project.importFiles([path],true,root,false);if(!ok)throw new Error('PNG import başarısız.');item=await findImported(root,path)}
+    if(!item){status(p.name+': Projeye import ediliyor...');const ok=await project.importFiles([path],true,root,false);if(!ok)throw new Error('PNG import başarısız.');project=await ppro.Project.getActiveProject();sequence=project&&await project.getActiveSequence();if(!sequence||sequence.guid.toString()!==labelSequence)throw new Error('Import sırasında sequence değişti.');root=await project.getRootItem();item=await findImported(root,path)}
     if(!item)throw new Error('PNG import edildi ama ProjectItem bulunamadı.');
+    if(await applyPlayerLabel(ppro,project,item,p.color)){
+      // Label edits invalidate native handles; reacquire before insertion.
+      project=await ppro.Project.getActiveProject();
+      sequence=project&&await project.getActiveSequence();
+      if(!sequence||sequence.guid.toString()!==labelSequence)throw new Error('Label uygulanırken sequence değişti.');
+      root=await project.getRootItem();item=await findImported(root,path);
+      if(!item)throw new Error('Label sonrası PNG bulunamadı.');
+    }
     const playhead=await sequence.getPlayerPosition();const trackIndex=await chooseVideoTrack(sequence,playhead);
     const expectedSequence=sequence.guid.toString();
     const editor=ppro.SequenceEditor.getEditor(sequence);
