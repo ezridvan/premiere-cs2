@@ -1,11 +1,11 @@
-CS2 Player Overlay v1.3.2 — Premiere Pro 25.6+ / UXP
+CS2 Player Overlay v1.3.3 — Premiere Pro 25.6+ / UXP
 
 Kurulum
 - Bu klasördeki manifest.json dosyasını UXP Developer Tool ile ekleyip Load/Reload yapın.
 - overlay-effects.js, numeric-control.js ve player-colors.js, main.js ile aynı klasörde bulunmalı.
 - Eklenti kimliği değişmediği için mevcut oyuncu kütüphanesi korunur.
 
-Animasyon (v1.3.2)
+Animasyon (v1.3.3)
 - Giriş ve çıkışta ease-in / ease-out hız profili: uçlarda yavaş, ortada hızlı.
 - Temporal Interpolation, LINEAR yerine native BEZIER olarak uygulanır.
 - Süreler, konum ve kayma mesafesi ayarı korunur.
@@ -13,6 +13,15 @@ Animasyon (v1.3.2)
 - API özel Bézier tutamaçlarını sunmadığı için eğri kare başına örneklenir;
   native Temporal Bézier modu gerçekten uygulanır. Özel Ease In/Out tutamaçları
   ve Spatial Auto Bézier bayrakları API'de bulunmadığından birebir menü kopyası değildir.
+
+Orange label düzeltmesi (v1.3.3)
+- Orange artık otomatik Mango yuvasına atanmaz.
+- Oyuncu ayarlarında Orange seçin. Premiere Project panelinde herhangi bir öğeye
+  istediğiniz Orange label'ını verin ve yalnızca o öğeyi seçin (timeline değil).
+- “Project panelinden Orange label öğren” düğmesine basın. Gerçek label indeksi
+  eklentinin veri klasöründeki color-labels.json dosyasına kaydedilir; yeniden
+  yüklemede korunur. Bu eşleşme tüm Orange oyuncular için kullanılır.
+- Daha önce yanlış label ile eklenen klipler otomatik değiştirilmez.
 
 Oyuncu renkleri
 - Ayarlarda beş renkten birini seçip Ayarları Kaydet'e basın.
@@ -23,7 +32,7 @@ Oyuncu renkleri
   yeni timeline klibi bu kaynak label'ını miras alır. Daha önce bağımsız label
   verilmiş mevcut timeline klipleri yeniden renklendirilmez.
 - Premiere'in mevcut label paleti kullanılır: YELLOW, BLUE, GREEN, PURPLE;
-  Orange için API'deki MANGO yuvası. Özel HEX palet ayarları değiştirilmez.
+  Orange için Project panelinden öğrenilen yuva. Özel HEX palet ayarları değiştirilmez.
 - Renk seçimi fotoğraf piksellerine tint/renklendirme efekti uygulamaz.
 
 Ayar alanları
@@ -46,7 +55,7 @@ Kullanım
   panel tekrar açılınca ve ilgili sequence aktif olunca düzeltilir.
 - Takip işareti klibin adındaki [CS2:...] ekidir. Otomatik takip için bu eki koruyun.
   Yönetilen ilk Transform efektini elle sıralamayın/değiştirmeyin; takip bu efekti yönetir.
-- v1.3.2: Kayma mesafesi (%) ayarı eklendi. Varsayılan 50: eski mesafenin yarısı.
+- v1.3.3: Kayma mesafesi (%) ayarı eklendi. Varsayılan 50: eski mesafenin yarısı.
   25 daha kısa, 100 orijinal mesafe, 0 hareketsizdir. Hem giriş hem çıkışa uygulanır.
   Position X fotoğrafın durduğu yeri belirler; kayma mesafesi bu konumu değiştirmez.
 - Önceki denemelerdeki süre kısaltmaları geri alındı. Giriş ~0,85 sn, çıkış ~0,87 sn.

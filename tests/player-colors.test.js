@@ -1,6 +1,6 @@
 const {test}=require('node:test');
 const assert=require('node:assert/strict');
-const {PLAYER_COLORS,getPlayerColor,applyPlayerLabel}=require('../player-colors');
+const {PLAYER_COLORS,getPlayerColor,applyPlayerLabel,readSelectedLabel}=require('../player-colors');
 function fixture(){
  const state={label:1,locked:false,transactions:0};
  const ppro={Constants:{ProjectItemColorLabel:{YELLOW:15,BLUE:9,GREEN:13,PURPLE:8,MANGO:7}}};
@@ -8,12 +8,12 @@ function fixture(){
  const project={lockedAccess:fn=>{state.locked=true;try{fn()}finally{state.locked=false}},executeTransaction:fn=>{state.transactions++;const actions=[];fn({addAction:a=>actions.push(a)});actions.forEach(a=>a());return true}};
  return {state,ppro,item,project};
 }
-test('the five exact swatches are preserved and Orange uses the Mango label slot',()=>{
+test('the five exact swatches are preserved and Orange is never silently mapped to Mango',()=>{
  assert.deepEqual(PLAYER_COLORS.map(c=>[c.name,c.hex]),[['Yellow','#fcff00'],['Blue','#8bcef2'],['Green','#169f82'],['Purple','#ba3094'],['Orange','#e18230']]);
- assert.equal(getPlayerColor('orange').label,'MANGO');assert.equal(getPlayerColor(undefined),null);
+ assert.equal(getPlayerColor('orange').label,'ORANGE');assert.equal(getPlayerColor(undefined),null);
 });
 test('each selected color is applied through the documented enum and undoable action',async()=>{
- for(const color of PLAYER_COLORS){const f=fixture();assert.equal(await applyPlayerLabel(f.ppro,f.project,f.item,color.id),true);assert.equal(f.state.label,f.ppro.Constants.ProjectItemColorLabel[color.label]);assert.equal(f.state.transactions,1)}
+ for(const color of PLAYER_COLORS){const f=fixture();assert.equal(await applyPlayerLabel(f.ppro,f.project,f.item,color.id,{orange:6}),true);assert.equal(f.state.label,color.id==='orange'?6:f.ppro.Constants.ProjectItemColorLabel[color.label]);assert.equal(f.state.transactions,1)}
 });
 test('unassigned old players and already matching source labels cause no edits',async()=>{
  const f=fixture();assert.equal(await applyPlayerLabel(f.ppro,f.project,f.item,null),false);
@@ -25,4 +25,22 @@ test('missing native label support and failed transactions are reported, not tre
  f.project.executeTransaction=()=>false;
  await assert.rejects(applyPlayerLabel(f.ppro,f.project,f.item,'yellow'),/uygulanamadı/);
  await assert.rejects(applyPlayerLabel(f.ppro,f.project,f.item,'invalid'),/Geçersiz/);
+});
+
+test('Orange without a learned mapping fails explicitly instead of assigning Mango',async()=>{
+ const f=fixture();await assert.rejects(applyPlayerLabel(f.ppro,f.project,f.item,'orange'),/eşlemesi gerekli/);
+ assert.equal(f.state.transactions,0);assert.equal(f.state.label,1);
+});
+test('Project panel selection provides the actual custom Orange slot',async()=>{
+ const f=fixture();f.state.label=6;
+ f.ppro.ProjectUtils={getSelection:async()=>({getItems:async()=>[f.item]})};
+ const index=await readSelectedLabel(f.ppro,f.project);
+ f.state.label=1;await applyPlayerLabel(f.ppro,f.project,f.item,'orange',{orange:index});
+ assert.equal(f.state.label,6);
+ f.ppro.ProjectUtils.getSelection=async()=>({getItems:async()=>[]});
+ await assert.rejects(readSelectedLabel(f.ppro,f.project),/tek bir öğeyi seç/);
+});
+test('invalid stored mappings are rejected before mutating the source label',async()=>{
+ const f=fixture();for(const orange of [-1,16,NaN,'6'])await assert.rejects(applyPlayerLabel(f.ppro,f.project,f.item,'orange',{orange}),/Geçersiz label/);
+ assert.equal(f.state.transactions,0);
 });

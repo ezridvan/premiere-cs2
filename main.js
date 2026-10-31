@@ -7,8 +7,10 @@ const {createEffects}=require('./overlay-effects.js');
 const effects=createEffects(ppro);
 const {bindNumericControl}=require('./numeric-control.js');
 const numericControls=[];
-const {PLAYER_COLORS,getPlayerColor,applyPlayerLabel}=require('./player-colors.js');
+const {PLAYER_COLORS,getPlayerColor,applyPlayerLabel,readSelectedLabel}=require('./player-colors.js');
 let selectedColor=null;
+let labelOverrides={};
+let labelSettingsReady=loadLabelSettings();
 let effectError='';
 const $=id=>document.getElementById(id);
 let players=[],selected=null,tab='favorites';
@@ -16,6 +18,19 @@ const defaults={color:'yellow',slideDistance:50,scale:100,x:960,y:540,rotation:0
 const specs=[['scale','Scale (%)',10,300,1],['x','Position X',-100000,100000,1],['y','Position Y',-100000,100000,1],['rotation','Rotation (°)',-180,180,1],['opacity','Opacity (%)',0,100,1],['slideDistance','Kayma mesafesi (%)',0,200,1]];
 function status(s){$('status').textContent=s}
 function make(tag,cls,txt){const n=document.createElement(tag);if(cls)n.className=cls;if(txt!==undefined)n.textContent=txt;return n}
+async function loadLabelSettings(){
+  try{
+    const dir=await fs.getDataFolder();
+    const data=JSON.parse(await (await dir.getEntry('color-labels.json')).read());
+    if(Number.isInteger(data.orange)&&data.orange>=0&&data.orange<=15)labelOverrides={orange:data.orange};
+  }catch(e){labelOverrides={}}
+}
+async function saveOrangeLabel(index){
+  const dir=await fs.getDataFolder();
+  const file=await dir.createFile('color-labels.json',{overwrite:true});
+  await file.write(JSON.stringify({orange:index}));
+  labelOverrides={orange:index};
+}
 async function saveDB(){const dir=await fs.getDataFolder();const f=await dir.createFile('players.json',{overwrite:true});await f.write(JSON.stringify(players));}
 async function loadDB(){try{const dir=await fs.getDataFolder();const f=await dir.getEntry('players.json');const data=JSON.parse(await f.read());players=Array.isArray(data)?data:[]}catch(e){players=[]}render();status(players.length+' oyuncu hazır.')}
 function render(){const grid=$('grid');while(grid.firstChild)grid.removeChild(grid.firstChild);const q=String($('search').value||'').trim().toLowerCase();const shown=players.filter(p=>(tab==='all'||p.fav)&&String(p.name||'').toLowerCase().includes(q));$('count').textContent=shown.length+' oyuncu gösteriliyor · Toplam '+players.length;$('empty').textContent=shown.length?'':'Burada henüz oyuncu yok.';shown.forEach(p=>{const card=make('div','card');const src=p.preview||p.src;if(src){const img=make('img','thumb');img.src=src;card.appendChild(img)}else card.appendChild(make('div','thumb','PNG yok'));card.appendChild(make('div','name',p.name));const color=getPlayerColor(p.color);if(color){const badge=make('div','player-color-badge',color.name);badge.style.color=color.hex;card.appendChild(badge)}const actions=make('div','cardactions');const star=make('button','',p.fav?'★':'☆');star.onclick=async e=>{e.stopPropagation();p.fav=!p.fav;await saveDB();render()};const edit=make('button','','⚙');edit.onclick=e=>{e.stopPropagation();choose(p.id)};star.title='Favori';edit.title='Ayarlar';actions.appendChild(star);actions.appendChild(edit);card.appendChild(actions);card.ondblclick=()=>insertPlayer(p);grid.appendChild(card)})}
@@ -33,6 +48,8 @@ function renderColorChoices(){
     button.onclick=()=>{selectedColor=color.id;renderColorChoices()};
     wrap.appendChild(button);
   });
+  $('orangeLabelSetup').className=selectedColor==='orange'?'':'hidden';
+  $('orangeLabelStatus').textContent=Number.isInteger(labelOverrides.orange)?'Orange label eşlemesi kayıtlı.':'Orange için bir kez label eşlemesi yap.';
   $('selectedColor').textContent=selectedColor?getPlayerColor(selectedColor).name+' · '+getPlayerColor(selectedColor).hex:'Henüz renk atanmadı.';
 }
 function makeFields(){
@@ -121,7 +138,8 @@ async function insertPlayer(p){
     let item=await findImported(root,path);
     if(!item){status(p.name+': Projeye import ediliyor...');const ok=await project.importFiles([path],true,root,false);if(!ok)throw new Error('PNG import başarısız.');project=await ppro.Project.getActiveProject();sequence=project&&await project.getActiveSequence();if(!sequence||sequence.guid.toString()!==labelSequence)throw new Error('Import sırasında sequence değişti.');root=await project.getRootItem();item=await findImported(root,path)}
     if(!item)throw new Error('PNG import edildi ama ProjectItem bulunamadı.');
-    if(await applyPlayerLabel(ppro,project,item,p.color)){
+    await labelSettingsReady;
+    if(await applyPlayerLabel(ppro,project,item,p.color,labelOverrides)){
       // Label edits invalidate native handles; reacquire before insertion.
       project=await ppro.Project.getActiveProject();
       sequence=project&&await project.getActiveSequence();
@@ -199,3 +217,15 @@ $('applyEffects').onclick=async()=>{
     status(applied+' klibe giriş / çıkış efekti uygulandı.'+(failures.length?' Atlanan: '+failures.join(' | '):''));
   }catch(e){status('Efekt hatası: '+e.message)}finally{inserting=false}
 };
+
+$('learnOrangeLabel').onclick=async()=>{
+  try{
+    await labelSettingsReady;
+    const project=await ppro.Project.getActiveProject();
+    if(!project)throw new Error('Aktif Premiere projesi yok.');
+    const index=await readSelectedLabel(ppro,project);
+    await saveOrangeLabel(index);
+    renderColorChoices();status('Orange label eşlemesi kaydedildi. Yeni eklediğin Orange oyuncular bu label ile eklenecek.');
+  }catch(e){status('Orange eşleme: '+e.message)}
+};
+labelSettingsReady.then(()=>{if(selected!==null)renderColorChoices()});
