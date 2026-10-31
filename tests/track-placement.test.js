@@ -8,8 +8,8 @@ test('a lower populated track gap is reused when upper tracks are occupied',asyn
 test('populated track gaps take priority over an existing empty upper track',async()=>{
  assert.equal(await chooseVideoTrack(sequence([[[0,100],[200,300]],[]]),1,'100','91'),0);
 });
-test('the highest suitable populated track is used',async()=>{
- assert.equal(await chooseVideoTrack(sequence([[[0,100],[300,400]],[[0,100],[200,300]]]),1,'100','91'),1);
+test('the lowest suitable populated track is used',async()=>{
+ assert.equal(await chooseVideoTrack(sequence([[[0,100],[300,400]],[[0,100],[200,300]]]),1,'100','91'),0);
 });
 test('an empty existing track is used before creating a new track',async()=>{
  assert.equal(await chooseVideoTrack(sequence([[],[[0,400]]]),1,'100','91'),0);
@@ -32,4 +32,11 @@ test('selection checks the actual 60 fps still duration at a nonzero playhead',a
 test('invalid timeline bounds fail instead of being treated as free space',async()=>{
  assert.throws(()=>hasRoom([{start:NaN,end:10}],0,91));
  await assert.rejects(chooseVideoTrack(sequence([]),1,'0','0'));
+});
+
+test('an empty V1 is preferred even if a populated upper track has a suitable gap',async()=>{
+ assert.equal(await chooseVideoTrack(sequence([[],[[0,100],[200,300]]]),1,'100','91'),0);
+});
+test('occupied V1 is skipped for the first suitable track above it, not the highest',async()=>{
+ assert.equal(await chooseVideoTrack(sequence([[[0,400]],[],[],[]]),1,'100','91'),1);
 });

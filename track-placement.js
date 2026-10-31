@@ -16,11 +16,9 @@ async function chooseVideoTrack(sequence, clipType, startTicks, durationTicks) {
   const start = Number(startTicks), duration = Number(durationTicks);
   hasRoom([], start, duration);
   const count = await sequence.getVideoTrackCount();
-  let empty = null;
-  for (let i = count - 1; i >= 0; i--) {
+  for (let i = 0; i < count; i++) {
     const track = await sequence.getVideoTrack(i);
     const clips = await track.getTrackItems(clipType, false);
-    if (!clips.length) { if (empty === null) empty = i; continue; }
     const intervals = [];
     for (const clip of clips) {
       intervals.push({start: Number((await clip.getStartTime()).ticks),
@@ -28,9 +26,9 @@ async function chooseVideoTrack(sequence, clipType, startTicks, durationTicks) {
     }
     if (hasRoom(intervals, start, duration)) return i;
   }
-  // Reuse a gap on a populated track first, then an entirely empty track.
-  // Returning count creates a new track only if every existing track is busy.
-  return empty === null ? count : empty;
+  // V1 first: empty tracks and gaps on populated tracks have equal priority.
+  // A new track is needed only if no existing track can fit the whole still.
+  return count;
 }
 
 module.exports = {hasRoom, chooseVideoTrack};
