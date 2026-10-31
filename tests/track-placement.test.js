@@ -1,7 +1,14 @@
 const {test}=require('node:test');
 const assert=require('node:assert/strict');
-const {hasRoom,chooseVideoTrack}=require('../track-placement');
-function sequence(tracks){return {getVideoTrackCount:async()=>tracks.length,getVideoTrack:async i=>({getTrackItems:async()=>tracks[i].map(([start,end])=>({getStartTime:async()=>({ticks:String(start)}),getEndTime:async()=>({ticks:String(end)})}))})}}
+const {hasRoom,chooseVideoTrack,isLogoName}=require('../track-placement');
+function sequence(tracks){return {
+ getVideoTrackCount:async()=>tracks.length,
+ getVideoTrack:async i=>({getTrackItems:async()=>tracks[i].map(entry=>{
+  const [start,end]=Array.isArray(entry)?entry:[entry.start,entry.end];
+  return {getStartTime:async()=>({ticks:String(start)}),getEndTime:async()=>({ticks:String(end)}),
+   getName:async()=>entry.name||'',getProjectItem:async()=>({name:entry.itemName||entry.name||''}),sourcePath:entry.path||''};
+ })})
+}}
 test('a lower populated track gap is reused when upper tracks are occupied',async()=>{
  assert.equal(await chooseVideoTrack(sequence([[[0,100],[191,300]],[[0,400]]]),1,'100','91'),0);
 });
@@ -39,4 +46,29 @@ test('an empty V1 is preferred even if a populated upper track has a suitable ga
 });
 test('occupied V1 is skipped for the first suitable track above it, not the highest',async()=>{
  assert.equal(await chooseVideoTrack(sequence([[[0,400]],[],[],[]]),1,'100','91'),1);
+});
+
+test('Logo.png is a boundary even if every track below it is empty',async()=>{
+ const tracks=[[],[],[],[],[{start:0,end:500,name:'Logo.png'}],[],[]];
+ assert.equal(await chooseVideoTrack(sequence(tracks),1,'100','91'),5);
+});
+test('the first fitting gap above the logo wins over higher tracks',async()=>{
+ const tracks=[[],[{start:0,end:500,name:'Logo.png'}],[[0,400]],[[0,100],[191,300]],[]];
+ assert.equal(await chooseVideoTrack(sequence(tracks),1,'100','91'),3);
+});
+test('a new track is created instead of falling back to free space below the logo',async()=>{
+ assert.equal(await chooseVideoTrack(sequence([[],[{start:0,end:500,name:'Logo.png'}],[[0,400]]]),1,'100','91'),3);
+});
+test('the highest logo defines the boundary if several copies exist',async()=>{
+ const tracks=[[{start:0,end:500,name:'Logo.png'}],[],[{start:0,end:500,name:'LOGO.PNG'}],[]];
+ assert.equal(await chooseVideoTrack(sequence(tracks),1,'100','91'),3);
+});
+test('a renamed timeline clip is recognized by its original Windows source path',async()=>{
+ const tracks=[[],[{start:0,end:500,name:'Branding',path:'C:/Brand/Logo.png'}],[]];
+ assert.equal(await chooseVideoTrack(sequence(tracks),1,'100','91',async clip=>clip.sourcePath),2);
+ assert.equal(isLogoName('C:\\Brand\\LOGO.PNG'),true);
+});
+test('unrelated filenames do not become a logo boundary',async()=>{
+ assert.equal(isLogoName('OtherLogo.png'),false);assert.equal(isLogoName('Logo.png.bak'),false);
+ assert.equal(await chooseVideoTrack(sequence([[],[{start:0,end:500,name:'OtherLogo.png'}]]),1,'100','91'),0);
 });

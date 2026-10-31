@@ -132,7 +132,12 @@ async function insertPlayer(p){
     if(!item)throw new Error('Süre sonrası PNG bulunamadı.');
     await verifyStillSourceDuration(ppro,item,durationTicks);
     const playhead=await sequence.getPlayerPosition();
-    const trackIndex=await chooseVideoTrack(sequence,ppro.Constants.TrackItemType.CLIP,playhead.ticks,durationTicks);
+    const trackIndex=await chooseVideoTrack(sequence,ppro.Constants.TrackItemType.CLIP,playhead.ticks,durationTicks,async clip=>{
+      // Source filename identifies Logo.png even if its timeline name changed.
+      const projectItem=await clip.getProjectItem();
+      try{const source=ppro.ClipProjectItem.cast(projectItem);return source?await source.getMediaFilePath():''}
+      catch(e){return projectItem&&projectItem.name||''}
+    });
     const expectedSequence=sequence.guid.toString();
     const editor=ppro.SequenceEditor.getEditor(sequence);
     const playheadTicks=playhead.ticks;
