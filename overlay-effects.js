@@ -138,7 +138,7 @@ function createEffects(ppro) {
     // are created, not only when the transaction eventually executes.
     const constants = [[0, new ppro.PointF(.5, .5)], [2, true],
       [3, player.scale], [4, player.scale], [5, 0], [6, 0],
-      [7, player.rotation], [8, player.opacity], [9, false], [10, 180]];
+      [7, player.rotation], [8, player.opacity], [9, false], [10, 360]];
     phase = 'Animasyon kanallarını hazırla';
     transact(project, 'CS2 animasyon kanallarını hazırla', () => {
       const actions = [];

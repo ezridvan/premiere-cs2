@@ -94,7 +94,7 @@ test('real action sequence creates Transform, configures player values and motio
   assert.equal(effect.getParam(7).constant,10);
   assert.equal(effect.getParam(8).constant,90);
   assert.equal(effect.getParam(9).constant,false);
-  assert.equal(effect.getParam(10).constant,180);
+  assert.equal(effect.getParam(10).constant,360);
   near(Math.min(...effect.getParam(1).keys.keys()),10);
   near(Math.max(...effect.getParam(1).keys.keys()),14.96);
   assert.equal(f.state.name,clipName(player));
@@ -221,8 +221,23 @@ test('requested defaults flow through positioning, Transform properties and moti
   const effect=f.state.components[0],position=effect.getParam(1);
   assert.equal(effect.getParam(3).constant,81);assert.equal(effect.getParam(4).constant,81);
   assert.equal(effect.getParam(7).constant,-27);assert.equal(effect.getParam(8).constant,100);
-  assert.equal(effect.getParam(9).constant,false);assert.equal(effect.getParam(10).constant,180);
+  assert.equal(effect.getParam(9).constant,false);assert.equal(effect.getParam(10).constant,360);
   const points=[...position.keys.values()];
   assert.ok(points.every(p=>p.y===2400/1080));
   near(Math.min(...points.map(p=>p.x)),8000/1920);
+});
+
+
+test('applied motion blur matches the 360-degree shutter angle in both original presets',async()=>{
+  const {readFileSync}=require('node:fs');const {join}=require('node:path');
+  const f=fixture({tagged:false,invalidate:true});await f.effects.apply(f.project,f.sequence,f.clip,player,true);
+  const effect=f.state.components[0];
+  for(const file of ['slideinleft.prfpset','slideoutright.prfpset']){
+    const xml=readFileSync(join(__dirname,'../presets',file),'utf8');
+    const blocks=[...xml.matchAll(/<VideoComponentParam\b[^>]*>([\s\S]*?)<\/VideoComponentParam>/g)].map(m=>m[1]);
+    const shutter=blocks.find(b=>b.includes('<Name>Shutter Angle</Name>'));
+    const original=Number(shutter.match(/<CurrentValue>([^<]+)<\/CurrentValue>/)[1]);
+    assert.equal(original,360);assert.equal(effect.getParam(10).constant,original);
+  }
+  assert.equal(effect.getParam(9).constant,false);
 });
