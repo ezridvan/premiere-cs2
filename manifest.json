@@ -2,7 +2,7 @@
   "manifestVersion": 5,
   "id": "com.siez.cs2playeroverlay",
   "name": "CS2 Player Overlay",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "main": "index.html",
   "host": {
     "app": "premierepro",

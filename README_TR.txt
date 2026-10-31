@@ -1,11 +1,11 @@
-CS2 Player Overlay v1.2.0 — Premiere Pro 25.6+ / UXP
+CS2 Player Overlay v1.2.1 — Premiere Pro 25.6+ / UXP
 
 Kurulum
 - Bu klasördeki manifest.json dosyasını UXP Developer Tool ile ekleyip Load/Reload yapın.
 - overlay-effects.js, numeric-control.js ve player-colors.js, main.js ile aynı klasörde bulunmalı.
 - Eklenti kimliği değişmediği için mevcut oyuncu kütüphanesi korunur.
 
-Oyuncu renkleri (v1.2.0)
+Oyuncu renkleri (v1.2.1)
 - Ayarlarda beş renkten birini seçip Ayarları Kaydet'e basın.
 - Yellow #fcff00, Blue #8bcef2, Green #169f82, Purple #ba3094, Orange #e18230.
 - Renk oyuncu verisiyle saklanır ve kütüphane kartında gösterilir.
@@ -37,7 +37,9 @@ Kullanım
   panel tekrar açılınca ve ilgili sequence aktif olunca düzeltilir.
 - Takip işareti klibin adındaki [CS2:...] ekidir. Otomatik takip için bu eki koruyun.
   Yönetilen ilk Transform efektini elle sıralamayın/değiştirmeyin; takip bu efekti yönetir.
-- Giriş ~0,85 sn, çıkış ~0,87 sn; klip kısa ise ikisi orantılı kısalır. En az iki kare gerekir.
+- v1.2.1 denemesi: girişten 10, çıkıştan 10 sequence karesi çıkarılır.
+  25 fps için giriş ~0,45 sn, çıkış ~0,47 sn. Klip süresi değişmez; ortadaki sabit
+  bölüm uzar. Çok kısa klipte ikisi orantılı kısalır. En az iki kare gerekir.
 - Oyuncu scale, konum, rotation ve opacity ayarları Transform'a uygulanır.
 - Otomatik güncelleme ayrı bir geri alınabilir Premiere işlemi oluşturur. Dışa aktarmadan
   önce doğru sequence'i etkinleştirin ve animasyonun güncellenmesini bekleyin.
@@ -49,7 +51,7 @@ Preset ayrıntısı ve sınırlar
 - .prfpset doğrudan import edilmez. Geometry2/Transform API ile yeniden oluşturulur.
   UXP özel temporal/spatial Bézier tutamaçlarını sunmadığı için yumuşama kare başına
   örneklenen smoothstep yaklaşımıdır; preset eğrilerinin birebir kopyası değildir.
-- Burada Premiere host bulunmuyor. 11 Node testi zamanlama, kırpma, kısa klip, eski
+- Burada Premiere host bulunmuyor. 12 Node testi zamanlama, kırpma, kısa klip, eski
   keyframe temizliği, efekt işlemleri ve otomatik takibi API taklitleriyle doğrular.
   Gerçek Premiere API davranışı ve render görüntüsü masaüstünde denenmelidir.
 

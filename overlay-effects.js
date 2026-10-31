@@ -16,9 +16,13 @@ function animationKeys(inPoint, outPoint, frameSeconds, player, size) {
   const end = outPoint - frameSeconds;
   const span = end - inPoint;
   if (!(span > 0)) throw new Error('Animasyon için klip en az iki kare olmalı.');
-  const ratio = Math.min(1, span / (IN_SECONDS + OUT_SECONDS));
-  const enterEnd = inPoint + IN_SECONDS * ratio;
-  const exitStart = end - OUT_SECONDS * ratio;
+  // Trial timing: remove ten sequence frames from each animation (20 total).
+  // Keep at least one frame per side at low frame rates.
+  const enterSeconds = Math.max(frameSeconds, IN_SECONDS - 10 * frameSeconds);
+  const exitSeconds = Math.max(frameSeconds, OUT_SECONDS - 10 * frameSeconds);
+  const ratio = Math.min(1, span / (enterSeconds + exitSeconds));
+  const enterEnd = inPoint + enterSeconds * ratio;
+  const exitStart = end - exitSeconds * ratio;
   const x = player.x / size.width, y = player.y / size.height;
   const keys = [];
   // UXP exposes interpolation modes but not the preset's temporal/spatial
