@@ -5,12 +5,12 @@ const player = {id:'a', name:'Player', x:960, y:540, scale:80, rotation:10, opac
 const size = {width:1920, height:1080};
 const near=(a,b)=>assert.ok(Math.abs(a-b)<1e-8, `${a} != ${b}`);
 
-test('source anchors and hold use durations shortened by ten frames on each side',()=>{
+test('source anchors and hold use durations shortened by eighteen entrance and seventeen exit frames',()=>{
   const keys=animationKeys(17,27,1/25,player,size);
   near(keys[0].time,17);near(keys.at(-1).time,26.96);
   near(keys[0].x,1.5104166269302368);near(keys.at(-1).x,keys[0].x);
-  near(keys.find(k=>Math.abs(k.time-(17+IN_SECONDS-10/25))<1e-8).x,.5);
-  near(keys.find(k=>Math.abs(k.time-(26.96-OUT_SECONDS+10/25))<1e-8).x,.5);
+  near(keys.find(k=>Math.abs(k.time-(17+IN_SECONDS-18/25))<1e-8).x,.5);
+  near(keys.find(k=>Math.abs(k.time-(26.96-OUT_SECONDS+17/25))<1e-8).x,.5);
 });
 test('left/right trims, extensions and short clips retain both boundary animations',()=>{
   for(const [start,end] of [[0,5],[1,5],[0,3],[0,30],[-3,5],[2,2.4],[0,.08]]){
@@ -153,12 +153,12 @@ test('native objects invalidated after every commit are reacquired for each anim
 });
 
 
-test('faster timing removes twenty sequence frames in total at common frame rates',()=>{
+test('faster timing removes thirty-five sequence frames in total at common frame rates',()=>{
   for(const fps of [24,25,30,60]){
     const frame=1/fps, keys=animationKeys(0,10,frame,player,size);
     const centered=keys.filter(k=>Math.abs(k.x-.5)<1e-8);
-    near(centered[0].time,IN_SECONDS-10*frame);
-    near(centered.at(-1).time,10-frame-OUT_SECONDS+10*frame);
+    near(centered[0].time,IN_SECONDS-18*frame);
+    near(centered.at(-1).time,10-frame-OUT_SECONDS+17*frame);
   }
   const slow=animationKeys(0,10,.1,player,size);
   assert.ok(slow.every((k,i)=>!i||k.time>slow[i-1].time));
