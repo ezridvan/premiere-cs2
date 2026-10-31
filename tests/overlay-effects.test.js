@@ -53,7 +53,7 @@ function fixture({existing=false, tagged=true, invalidate=false}={}) {
   const time=s=>({seconds:s,ticks:String(Math.round(s*254016000000))});
   const state={input:10,output:15,start:100,end:105,name:tagged?clipName(player):'ordinary',transactions:[],components:[]};
   function param(){
-    const p={keys:new Map(),constant:null,varying:false};
+    const p={keys:new Map(),constant:null,varying:false,interpolation:new Map()};
     p.createKeyframe=value=>({value});
     p.areKeyframesSupported=async()=>true;
     p.getKeyframeListAsTickTimes=()=>[...p.keys.keys()].map(time);
@@ -61,7 +61,7 @@ function fixture({existing=false, tagged=true, invalidate=false}={}) {
     p.createSetTimeVaryingAction=v=>()=>p.varying=v;
     p.createSetValueAction=k=>{assert.equal(p.varying,false,'static value action requires a committed non-varying stream');return ()=>p.constant=k.value};
     p.createAddKeyframeAction=k=>{assert.equal(p.varying,true,'keyframe action requires a committed time-varying stream');return ()=>p.keys.set(k.position.seconds,k.value)};
-    p.createSetInterpolationAtKeyframeAction=t=>{assert.ok(p.keys.has(t.seconds),'interpolation action requires a committed keyframe');return ()=>{}};
+    p.createSetInterpolationAtKeyframeAction=(t,mode)=>{assert.ok(p.keys.has(t.seconds),'interpolation action requires a committed keyframe');return ()=>p.interpolation.set(t.seconds,mode)};
     return p;
   }
   const component=()=>{
@@ -80,7 +80,7 @@ function fixture({existing=false, tagged=true, invalidate=false}={}) {
       const actions=[];fn({addAction:a=>actions.push(a)});actions.forEach(a=>a());state.transactions.push(title);revision++;return true;
     }};
   const ppro={Guid:{fromString:s=>s},PointF:class {constructor(x,y){this.x=x;this.y=y}},TickTime:{createWithSeconds:time},
-    Constants:{TrackItemType:{CLIP:1},InterpolationMode:{LINEAR:0}},
+    Constants:{TrackItemType:{CLIP:1},InterpolationMode:{LINEAR:0,BEZIER:5}},
     VideoFilterFactory:{createComponent:async()=>component()},Project:{getActiveProject:async()=>project}};
   return {state,clip:native(clip),sequence,project,effects:createEffects(ppro)};
 }
@@ -175,13 +175,22 @@ test('zero travel remains stationary and invalid distances are rejected',()=>{
 });
 
 
-test('entrance starts fast and decelerates monotonically to the unchanged destination',()=>{
+test('entrance and exit ease in and out without changing travel distance or timing',()=>{
   const keys=animationKeys(0,5,.04,player,size);
   const enter=keys.filter(k=>k.time<=IN_SECONDS+1e-8);
-  const moves=enter.slice(1).map((k,i)=>Math.abs(k.x-enter[i].x));
-  assert.ok(moves[0]>moves.at(-1)*10);
-  for(let i=1;i<moves.length;i++)assert.ok(moves[i]<moves[i-1]);
+  const exit=keys.filter(k=>k.time>=5-.04-OUT_SECONDS-1e-8);
+  for(const segment of [enter,exit]){
+    const moves=segment.slice(1).map((k,i)=>Math.abs(k.x-segment[i].x));
+    const middle=moves[Math.floor(moves.length/2)];
+    assert.ok(moves[0]<middle/3);assert.ok(moves.at(-1)<middle/3);
+  }
   near(enter.at(-1).x,player.x/size.width);
   near(enter.at(-1).time,IN_SECONDS);
-  assert.ok(enter.every(k=>k.y===player.y/size.height));
+});
+test('all native temporal interpolation actions use BEZIER rather than LINEAR',async()=>{
+  const f=fixture({tagged:false,invalidate:true});
+  await f.effects.apply(f.project,f.sequence,f.clip,player,true);
+  const param=f.state.components[0].getParam(1);
+  assert.equal(param.interpolation.size,param.keys.size);
+  assert.ok([...param.interpolation.values()].every(mode=>mode===5));
 });
