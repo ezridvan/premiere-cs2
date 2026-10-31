@@ -33,19 +33,20 @@ function animationKeys(inPoint, outPoint, frameSeconds, player, size) {
   // UXP exposes interpolation modes but not the preset's temporal/spatial
   // tangent handles. Sample a smooth easing curve; do not claim a binary import
   // of the .prfpset or an exact reproduction of its Bezier handles.
-  function segment(a, b, from, to) {
+  function segment(a, b, from, to, decelerate = false) {
     const count = Math.max(1, Math.ceil((b - a) / frameSeconds));
     for (let i = 0; i <= count; i++) {
       const t = i / count;
-      // Ease in/out: zero endpoint velocity, maximum speed mid-move.
-      const ease = t * t * (3 - 2 * t);
+      // Entrance: immediate movement, progressively gentler arrival.
+      // Exit keeps its existing ease-in/out profile.
+      const ease = decelerate ? 1 - Math.pow(1 - t, 4) : t * t * (3 - 2 * t);
       const time = a + (b - a) * t;
       const point = {time, x: from + (to - from) * ease, y};
       if (keys.length && Math.abs(keys[keys.length - 1].time - time) < 1e-8) keys.pop();
       keys.push(point);
     }
   }
-  segment(inPoint, enterEnd, x + offset, x);
+  segment(inPoint, enterEnd, x + offset, x, true);
   segment(Math.max(enterEnd, exitStart), end, x, x + offset);
   return keys;
 }
@@ -137,7 +138,7 @@ function createEffects(ppro) {
     // are created, not only when the transaction eventually executes.
     const constants = [[0, new ppro.PointF(.5, .5)], [2, true],
       [3, player.scale], [4, player.scale], [5, 0], [6, 0],
-      [7, player.rotation], [8, player.opacity], [9, false], [10, 90]];
+      [7, player.rotation], [8, player.opacity], [9, false], [10, 180]];
     phase = 'Animasyon kanallarını hazırla';
     transact(project, 'CS2 animasyon kanallarını hazırla', () => {
       const actions = [];

@@ -15,7 +15,7 @@ let labelSettingsReady=loadLabelSettings();
 let effectError='';
 const $=id=>document.getElementById(id);
 let players=[],selected=null,tab='favorites';
-const defaults={color:'yellow',slideDistance:50,scale:100,x:960,y:540,rotation:0,opacity:100};
+const defaults=require('./player-defaults.js');
 const specs=[['scale','Scale (%)',10,300,1],['x','Position X',-100000,100000,1],['y','Position Y',-100000,100000,1],['rotation','Rotation (°)',-180,180,1],['opacity','Opacity (%)',0,100,1],['slideDistance','Kayma mesafesi (%)',0,200,1]];
 function status(s){$('status').textContent=s}
 function make(tag,cls,txt){const n=document.createElement(tag);if(cls)n.className=cls;if(txt!==undefined)n.textContent=txt;return n}

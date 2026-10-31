@@ -94,7 +94,7 @@ test('real action sequence creates Transform, configures player values and motio
   assert.equal(effect.getParam(7).constant,10);
   assert.equal(effect.getParam(8).constant,90);
   assert.equal(effect.getParam(9).constant,false);
-  assert.equal(effect.getParam(10).constant,90);
+  assert.equal(effect.getParam(10).constant,180);
   near(Math.min(...effect.getParam(1).keys.keys()),10);
   near(Math.max(...effect.getParam(1).keys.keys()),14.96);
   assert.equal(f.state.name,clipName(player));
@@ -175,17 +175,19 @@ test('zero travel remains stationary and invalid distances are rejected',()=>{
 });
 
 
-test('entrance and exit ease in and out without changing travel distance or timing',()=>{
-  const keys=animationKeys(0,5,.04,player,size);
+test('entrance starts fast and decelerates while exit keeps its eased profile',()=>{
+  const keys=animationKeys(0,5,1/60,player,size);
   const enter=keys.filter(k=>k.time<=IN_SECONDS+1e-8);
-  const exit=keys.filter(k=>k.time>=5-.04-OUT_SECONDS-1e-8);
-  for(const segment of [enter,exit]){
-    const moves=segment.slice(1).map((k,i)=>Math.abs(k.x-segment[i].x));
-    const middle=moves[Math.floor(moves.length/2)];
-    assert.ok(moves[0]<middle/3);assert.ok(moves.at(-1)<middle/3);
-  }
-  near(enter.at(-1).x,player.x/size.width);
-  near(enter.at(-1).time,IN_SECONDS);
+  const exit=keys.filter(k=>k.time>=5-1/60-OUT_SECONDS-1e-8);
+  const moves=enter.slice(1).map((k,i)=>Math.abs(k.x-enter[i].x));
+  assert.ok(moves[0]>moves[Math.floor(moves.length/2)]*3);
+  for(let i=1;i<moves.length;i++)assert.ok(moves[i]<moves[i-1]);
+  const progress=(enter[0].x-enter[Math.floor(enter.length/2)].x)/(enter[0].x-enter.at(-1).x);
+  assert.ok(progress>.9,'more than 90% of travel is complete by the halfway point');
+  const exitMoves=exit.slice(1).map((k,i)=>Math.abs(k.x-exit[i].x));
+  const middle=exitMoves[Math.floor(exitMoves.length/2)];
+  assert.ok(exitMoves[0]<middle/3);assert.ok(exitMoves.at(-1)<middle/3);
+  near(enter.at(-1).x,player.x/size.width);near(enter.at(-1).time,IN_SECONDS);
 });
 test('all native temporal interpolation actions use BEZIER rather than LINEAR',async()=>{
   const f=fixture({tagged:false,invalidate:true});
@@ -208,4 +210,19 @@ test('entrance arrives in 44/50 of the previous duration without changing endpoi
     const hold=keys.filter(k=>Math.abs(k.x-.5)<1e-8);
     near(hold.at(-1).time,20-1/fps-45/60);
   }
+});
+
+
+test('requested defaults flow through positioning, Transform properties and motion blur',async()=>{
+  const defaults=require('../player-defaults');
+  assert.deepEqual([defaults.scale,defaults.x,defaults.y,defaults.rotation,defaults.opacity,defaults.slideDistance],[81,8000,2400,-27,100,50]);
+  const f=fixture({tagged:false,invalidate:true});
+  await f.effects.apply(f.project,f.sequence,f.clip,{...defaults,id:'default',name:'New Player'},true);
+  const effect=f.state.components[0],position=effect.getParam(1);
+  assert.equal(effect.getParam(3).constant,81);assert.equal(effect.getParam(4).constant,81);
+  assert.equal(effect.getParam(7).constant,-27);assert.equal(effect.getParam(8).constant,100);
+  assert.equal(effect.getParam(9).constant,false);assert.equal(effect.getParam(10).constant,180);
+  const points=[...position.keys.values()];
+  assert.ok(points.every(p=>p.y===2400/1080));
+  near(Math.min(...points.map(p=>p.x)),8000/1920);
 });
