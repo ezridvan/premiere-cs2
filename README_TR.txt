@@ -1,21 +1,28 @@
-CS2 Player Overlay v1.3.4 — Premiere Pro 25.6+ / UXP
+CS2 Player Overlay v1.3.5 — Premiere Pro 25.6+ / UXP
 
 Kurulum
 - Bu klasördeki manifest.json dosyasını UXP Developer Tool ile ekleyip Load/Reload yapın.
-- overlay-effects.js, numeric-control.js ve player-colors.js, main.js ile aynı klasörde bulunmalı.
+- overlay-effects.js, numeric-control.js ve player-colors.js ve still-duration.js, main.js ile aynı klasörde bulunmalı.
 - Eklenti kimliği değişmediği için mevcut oyuncu kütüphanesi korunur.
 
-Animasyon (v1.3.4)
+Fotoğraf süresi (v1.3.5)
+- Çıkış süresi 60 fps'de 45 kareye (0,75 sn) indirildi. Giriş ~0,748 sn olarak korundu.
+- Yeni klip uzunluğu iki animasyonu hızlandırmadan sığdıran en kısa tam kare sayısıdır:
+  60 fps'de 91 kare, yani 00:00:01:31. Diğer fps'lerde sekans timebase'iyle hesaplanır.
+- Kaynak in/out işaretleri eklemeden önce ayarlanıp doğrulanır; boş track/aralık
+  seçimi bu süreyi kullanır. Eski timeline kliplerinin süreleri değiştirilmez.
+
+Animasyon (v1.3.5)
 - Giriş ve çıkışta ease-in / ease-out hız profili: uçlarda yavaş, ortada hızlı.
 - Temporal Interpolation, LINEAR yerine native BEZIER olarak uygulanır.
-- v1.3.4: Giriş süresi 44/50 oranına indirildi (%12 daha kısa, ~0,748 sn).
-  Başlangıç/varış konumları, kayma mesafesi ve çıkış süresi değişmedi.
+- v1.3.5: Giriş süresi 44/50 oranına indirildi (%12 daha kısa, ~0,748 sn).
+  Başlangıç/varış konumları, kayma mesafesi ve çıkış süresi 0,75 sn olarak güncellendi.
 - Hafif hareket bulanıklığı: Transform shutter angle 90°, composition shutter kapalı.
 - API özel Bézier tutamaçlarını sunmadığı için eğri kare başına örneklenir;
   native Temporal Bézier modu gerçekten uygulanır. Özel Ease In/Out tutamaçları
   ve Spatial Auto Bézier bayrakları API'de bulunmadığından birebir menü kopyası değildir.
 
-Orange label düzeltmesi (v1.3.4)
+Orange label düzeltmesi (v1.3.5)
 - Orange artık otomatik Mango yuvasına atanmaz.
 - Oyuncu ayarlarında Orange seçin. Premiere Project panelinde herhangi bir öğeye
   istediğiniz Orange label'ını verin ve yalnızca o öğeyi seçin (timeline değil).
@@ -56,10 +63,10 @@ Kullanım
   panel tekrar açılınca ve ilgili sequence aktif olunca düzeltilir.
 - Takip işareti klibin adındaki [CS2:...] ekidir. Otomatik takip için bu eki koruyun.
   Yönetilen ilk Transform efektini elle sıralamayın/değiştirmeyin; takip bu efekti yönetir.
-- v1.3.4: Kayma mesafesi (%) ayarı eklendi. Varsayılan 50: eski mesafenin yarısı.
+- v1.3.5: Kayma mesafesi (%) ayarı eklendi. Varsayılan 50: eski mesafenin yarısı.
   25 daha kısa, 100 orijinal mesafe, 0 hareketsizdir. Hem giriş hem çıkışa uygulanır.
   Position X fotoğrafın durduğu yeri belirler; kayma mesafesi bu konumu değiştirmez.
-- Önceki denemelerdeki süre kısaltmaları geri alındı. Giriş ~0,748 sn, çıkış ~0,87 sn.
+- Önceki denemelerdeki süre kısaltmaları geri alındı. Giriş ~0,748 sn, çıkış 0,75 sn.
   Klip kısa ise ikisi orantılı kısalır. En az iki kare gerekir.
 - Oyuncu scale, konum, rotation ve opacity ayarları Transform'a uygulanır.
 - Otomatik güncelleme ayrı bir geri alınabilir Premiere işlemi oluşturur. Dışa aktarmadan
@@ -87,4 +94,4 @@ Masaüstü kontrolü
 6. Farklı sequence'e geçin, geri dönün; ilgisiz kliplerde değişiklik olmadığını doğrulayın.
 
 Bulut kontrolleri: node --check main.js; node --check overlay-effects.js;
-node tests/overlay-effects.test.js; node tests/numeric-control.test.js; node tests/player-colors.test.js
+node tests/overlay-effects.test.js; node tests/numeric-control.test.js; node tests/player-colors.test.js; node tests/still-duration.test.js

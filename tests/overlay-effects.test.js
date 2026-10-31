@@ -196,7 +196,7 @@ test('all native temporal interpolation actions use BEZIER rather than LINEAR',a
 });
 
 
-test('entrance arrives in 44/50 of the previous duration without changing endpoints or exit timing',()=>{
+test('entrance arrives in 44/50 of the previous duration without changing endpoints; exit uses 45 frames at 60 fps',()=>{
   for(const fps of [25,30,60]){
     const keys=animationKeys(10,20,1/fps,player,size);
     const landing=keys.find(k=>Math.abs(k.x-.5)<1e-8);
@@ -206,6 +206,6 @@ test('entrance arrives in 44/50 of the previous duration without changing endpoi
     near(keys.at(-1).time,20-1/fps);
     near(keys.at(-1).x,keys[0].x);
     const hold=keys.filter(k=>Math.abs(k.x-.5)<1e-8);
-    near(hold.at(-1).time,20-1/fps-(3678998400000-3458145600000)/254016000000);
+    near(hold.at(-1).time,20-1/fps-45/60);
   }
 });

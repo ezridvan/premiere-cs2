@@ -7,6 +7,7 @@ const {createEffects}=require('./overlay-effects.js');
 const effects=createEffects(ppro);
 const {bindNumericControl}=require('./numeric-control.js');
 const numericControls=[];
+const {stillDurationTicks,setStillSourceDuration,verifyStillSourceDuration}=require('./still-duration.js');
 const {PLAYER_COLORS,getPlayerColor,applyPlayerLabel,readSelectedLabel}=require('./player-colors.js');
 let selectedColor=null;
 let labelOverrides={};
@@ -101,9 +102,9 @@ async function findImported(folder,path){
   return null;
 }
 // Choose the highest existing track that can safely accept a still image.
-// Prefer completely empty tracks, then a gap of at least 5 seconds.
+// Prefer empty tracks, then a gap large enough for the exact still duration.
 // Never overwrite existing clips just to avoid creating a new track.
-async function chooseVideoTrack(sequence,playhead){
+async function chooseVideoTrack(sequence,playhead,reserveSeconds){
   const count=await sequence.getVideoTrackCount();
   const tracks=[];
   for(let i=count-1;i>=0;i--){
@@ -114,7 +115,6 @@ async function chooseVideoTrack(sequence,playhead){
   const empty=tracks.find(t=>t.clips.length===0);
   if(empty)return empty.index;
   const start=playhead.seconds;
-  const reserveSeconds=5;
   for(const t of tracks){
     let available=true;
     for(const clip of t.clips){
@@ -147,7 +147,16 @@ async function insertPlayer(p){
       root=await project.getRootItem();item=await findImported(root,path);
       if(!item)throw new Error('Label sonrası PNG bulunamadı.');
     }
-    const playhead=await sequence.getPlayerPosition();const trackIndex=await chooseVideoTrack(sequence,playhead);
+    const durationTicks=stillDurationTicks(await sequence.getTimebase());
+    setStillSourceDuration(ppro,project,item,durationTicks);
+    project=await ppro.Project.getActiveProject();
+    sequence=project&&await project.getActiveSequence();
+    if(!sequence||sequence.guid.toString()!==labelSequence)throw new Error('Süre ayarlanırken sequence değişti.');
+    root=await project.getRootItem();item=await findImported(root,path);
+    if(!item)throw new Error('Süre sonrası PNG bulunamadı.');
+    await verifyStillSourceDuration(ppro,item,durationTicks);
+    const playhead=await sequence.getPlayerPosition();
+    const trackIndex=await chooseVideoTrack(sequence,playhead,Number(durationTicks)/254016000000);
     const expectedSequence=sequence.guid.toString();
     const editor=ppro.SequenceEditor.getEditor(sequence);
     let success=false;
@@ -168,6 +177,7 @@ async function insertPlayer(p){
       if(source&&await source.getMediaFilePath()===path)candidates.push(clip);
     }
     if(candidates.length!==1)throw new Error('PNG eklendi fakat animasyon uygulanacak klip kesin olarak bulunamadı.');
+    if(Number((await candidates[0].getDuration()).ticks)!==Number(durationTicks))throw new Error('PNG eklendi fakat timeline süresi hesaplanan kısa süre ile eşleşmedi.');
     try{await effects.apply(project,sequence,candidates[0],p,true)}
     catch(e){throw new Error('PNG timeline’da; efekt uygulanamadı: '+(e.message||e))}
     status('✓ '+p.name+' giriş / çıkış animasyonuyla eklendi (V'+(trackIndex+1)+').');
