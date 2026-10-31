@@ -5,12 +5,12 @@ const player = {id:'a', name:'Player', x:960, y:540, scale:80, rotation:10, opac
 const size = {width:1920, height:1080};
 const near=(a,b)=>assert.ok(Math.abs(a-b)<1e-8, `${a} != ${b}`);
 
-test('source anchors and hold use durations shortened by eighteen entrance and seventeen exit frames',()=>{
+test('source anchors and hold use shortened durations with a one-frame minimum',()=>{
   const keys=animationKeys(17,27,1/25,player,size);
   near(keys[0].time,17);near(keys.at(-1).time,26.96);
   near(keys[0].x,1.5104166269302368);near(keys.at(-1).x,keys[0].x);
-  near(keys.find(k=>Math.abs(k.time-(17+IN_SECONDS-18/25))<1e-8).x,.5);
-  near(keys.find(k=>Math.abs(k.time-(26.96-OUT_SECONDS+17/25))<1e-8).x,.5);
+  near(keys.find(k=>Math.abs(k.time-(17+Math.max(1/25,IN_SECONDS-26/25)))<1e-8).x,.5);
+  near(keys.find(k=>Math.abs(k.time-(26.96-Math.max(1/25,OUT_SECONDS-26/25)))<1e-8).x,.5);
 });
 test('left/right trims, extensions and short clips retain both boundary animations',()=>{
   for(const [start,end] of [[0,5],[1,5],[0,3],[0,30],[-3,5],[2,2.4],[0,.08]]){
@@ -146,19 +146,20 @@ test('native objects invalidated after every commit are reacquired for each anim
   const f=fixture({tagged:false,invalidate:true});
   await f.effects.apply(f.project,f.sequence,f.clip,player,true);
   assert.equal(f.state.components.length,1);
-  assert.ok(f.state.components[0].getParam(1).keys.size>4);
+  // At 25 fps the new timing reaches the one-frame minimum: four boundary keys.
+  assert.equal(f.state.components[0].getParam(1).keys.size,4);
   f.state.input=11;f.state.start=101;
   await f.effects.sync([player]);await f.effects.sync([player]);
   near(Math.min(...f.state.components[0].getParam(1).keys.keys()),11);
 });
 
 
-test('faster timing removes thirty-five sequence frames in total at common frame rates',()=>{
+test('faster timing removes fifty-two frames when possible and preserves one-frame boundary animations',()=>{
   for(const fps of [24,25,30,60]){
     const frame=1/fps, keys=animationKeys(0,10,frame,player,size);
     const centered=keys.filter(k=>Math.abs(k.x-.5)<1e-8);
-    near(centered[0].time,IN_SECONDS-18*frame);
-    near(centered.at(-1).time,10-frame-OUT_SECONDS+17*frame);
+    near(centered[0].time,Math.max(frame,IN_SECONDS-26*frame));
+    near(centered.at(-1).time,10-frame-Math.max(frame,OUT_SECONDS-26*frame));
   }
   const slow=animationKeys(0,10,.1,player,size);
   assert.ok(slow.every((k,i)=>!i||k.time>slow[i-1].time));

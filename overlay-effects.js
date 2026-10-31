@@ -16,10 +16,10 @@ function animationKeys(inPoint, outPoint, frameSeconds, player, size) {
   const end = outPoint - frameSeconds;
   const span = end - inPoint;
   if (!(span > 0)) throw new Error('Animasyon için klip en az iki kare olmalı.');
-  // Trial timing: remove 18 entrance + 17 exit sequence frames (35 total).
+  // Trial timing: remove 26 entrance + 26 exit sequence frames (52 total).
   // Keep at least one frame per side at low frame rates.
-  const enterSeconds = Math.max(frameSeconds, IN_SECONDS - 18 * frameSeconds);
-  const exitSeconds = Math.max(frameSeconds, OUT_SECONDS - 17 * frameSeconds);
+  const enterSeconds = Math.max(frameSeconds, IN_SECONDS - 26 * frameSeconds);
+  const exitSeconds = Math.max(frameSeconds, OUT_SECONDS - 26 * frameSeconds);
   const ratio = Math.min(1, span / (enterSeconds + exitSeconds));
   const enterEnd = inPoint + enterSeconds * ratio;
   const exitStart = end - exitSeconds * ratio;

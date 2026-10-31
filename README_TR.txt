@@ -1,11 +1,11 @@
-CS2 Player Overlay v1.2.2 — Premiere Pro 25.6+ / UXP
+CS2 Player Overlay v1.2.3 — Premiere Pro 25.6+ / UXP
 
 Kurulum
 - Bu klasördeki manifest.json dosyasını UXP Developer Tool ile ekleyip Load/Reload yapın.
 - overlay-effects.js, numeric-control.js ve player-colors.js, main.js ile aynı klasörde bulunmalı.
 - Eklenti kimliği değişmediği için mevcut oyuncu kütüphanesi korunur.
 
-Oyuncu renkleri (v1.2.2)
+Oyuncu renkleri (v1.2.3)
 - Ayarlarda beş renkten birini seçip Ayarları Kaydet'e basın.
 - Yellow #fcff00, Blue #8bcef2, Green #169f82, Purple #ba3094, Orange #e18230.
 - Renk oyuncu verisiyle saklanır ve kütüphane kartında gösterilir.
@@ -37,8 +37,8 @@ Kullanım
   panel tekrar açılınca ve ilgili sequence aktif olunca düzeltilir.
 - Takip işareti klibin adındaki [CS2:...] ekidir. Otomatik takip için bu eki koruyun.
   Yönetilen ilk Transform efektini elle sıralamayın/değiştirmeyin; takip bu efekti yönetir.
-- v1.2.2 denemesi: girişten 18, çıkıştan 17 sequence karesi çıkarılır (önceki sürümden 15 kare daha kısa).
-  25 fps için giriş ~0,13 sn, çıkış ~0,19 sn. Klip süresi değişmez; ortadaki sabit
+- v1.2.3 denemesi: girişten 26, çıkıştan 26 sequence karesi çıkarılır (önceki sürümden 17 kare daha kısa; her uçta en az bir kare korunur).
+  25 fps için giriş ve çıkış birer kare (0,04 sn); 60 fps için ~0,42 / ~0,44 sn. Klip süresi değişmez; ortadaki sabit
   bölüm uzar. Çok kısa klipte ikisi orantılı kısalır. En az iki kare gerekir.
 - Oyuncu scale, konum, rotation ve opacity ayarları Transform'a uygulanır.
 - Otomatik güncelleme ayrı bir geri alınabilir Premiere işlemi oluşturur. Dışa aktarmadan
