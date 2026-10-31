@@ -7,6 +7,7 @@ const {createEffects}=require('./overlay-effects.js');
 const effects=createEffects(ppro);
 const {bindNumericControl}=require('./numeric-control.js');
 const numericControls=[];
+const {chooseVideoTrack}=require('./track-placement.js');
 const {stillDurationTicks,setStillSourceDuration,verifyStillSourceDuration,fitInsertedStill}=require('./still-duration.js');
 const {PLAYER_COLORS,getPlayerColor,applyPlayerLabel,readSelectedLabel}=require('./player-colors.js');
 let selectedColor=null;
@@ -101,16 +102,6 @@ async function findImported(folder,path){
   }
   return null;
 }
-// Still imports may ignore source duration. Insert only on an empty/new track
-// so a temporary long still cannot overwrite unrelated clips before trimming.
-async function chooseVideoTrack(sequence){
-  const count=await sequence.getVideoTrackCount();
-  for(let i=count-1;i>=0;i--){
-    const track=await sequence.getVideoTrack(i);
-    if((await track.getTrackItems(ppro.Constants.TrackItemType.CLIP,false)).length===0)return i;
-  }
-  return count;
-}
 let inserting=false;
 async function insertPlayer(p){
   if(inserting||effects.isBusy())return status('Önceki işlem sürüyor, tekrar dene.');inserting=true;
@@ -141,7 +132,7 @@ async function insertPlayer(p){
     if(!item)throw new Error('Süre sonrası PNG bulunamadı.');
     await verifyStillSourceDuration(ppro,item,durationTicks);
     const playhead=await sequence.getPlayerPosition();
-    const trackIndex=await chooseVideoTrack(sequence);
+    const trackIndex=await chooseVideoTrack(sequence,ppro.Constants.TrackItemType.CLIP,playhead.ticks,durationTicks);
     const expectedSequence=sequence.guid.toString();
     const editor=ppro.SequenceEditor.getEditor(sequence);
     const playheadTicks=playhead.ticks;
