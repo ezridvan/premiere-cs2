@@ -36,4 +36,36 @@ async function verifyStillSourceDuration(ppro, item, ticks) {
     throw new Error('PNG süresi doğrulanamadı; uzun klip eklememek için işlem durduruldu.');
   }
 }
-module.exports = {stillDurationTicks, setStillSourceDuration, verifyStillSourceDuration};
+async function fitInsertedStill(ppro, resolve, ticks) {
+  // getDuration() can disagree with timeline bounds for an imported still.
+  // Use sequence end-start and source out-in, then trim the actual new item.
+  const target = Number(ticks);
+  async function bounds(clip) {
+    const start = Number((await clip.getStartTime()).ticks);
+    const end = Number((await clip.getEndTime()).ticks);
+    const input = Number((await clip.getInPoint()).ticks);
+    const output = Number((await clip.getOutPoint()).ticks);
+    return {start, end, input, output};
+  }
+  let fresh = await resolve();
+  let b = await bounds(fresh.clip);
+  if (b.end - b.start === target && b.output - b.input === target) return '';
+  let failure = '';
+  try {
+    let ok = false;
+    fresh.project.lockedAccess(() => {
+      ok = fresh.project.executeTransaction(compound => {
+        compound.addAction(fresh.clip.createSetOutPointAction(
+          ppro.TickTime.createWithTicks(String(b.input + target))));
+        compound.addAction(fresh.clip.createSetEndAction(
+          ppro.TickTime.createWithTicks(String(b.start + target))));
+      }, 'CS2 eklenen PNG süresini düzelt');
+    });
+    if (!ok) failure = 'Premiere süre düzeltmesini kabul etmedi.';
+  } catch (e) { failure = e.message || String(e); }
+  fresh = await resolve(); // Mutations invalidate clip/parameter wrappers.
+  b = await bounds(fresh.clip);
+  if (b.end - b.start === target && b.output - b.input === target) return '';
+  return 'Süre ayarlanamadı; animasyon mevcut klip süresine uygulandı.' + (failure ? ' ' + failure : '');
+}
+module.exports = {stillDurationTicks, setStillSourceDuration, verifyStillSourceDuration, fitInsertedStill};

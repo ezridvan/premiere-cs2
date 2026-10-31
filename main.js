@@ -7,7 +7,7 @@ const {createEffects}=require('./overlay-effects.js');
 const effects=createEffects(ppro);
 const {bindNumericControl}=require('./numeric-control.js');
 const numericControls=[];
-const {stillDurationTicks,setStillSourceDuration,verifyStillSourceDuration}=require('./still-duration.js');
+const {stillDurationTicks,setStillSourceDuration,verifyStillSourceDuration,fitInsertedStill}=require('./still-duration.js');
 const {PLAYER_COLORS,getPlayerColor,applyPlayerLabel,readSelectedLabel}=require('./player-colors.js');
 let selectedColor=null;
 let labelOverrides={};
@@ -101,28 +101,13 @@ async function findImported(folder,path){
   }
   return null;
 }
-// Choose the highest existing track that can safely accept a still image.
-// Prefer empty tracks, then a gap large enough for the exact still duration.
-// Never overwrite existing clips just to avoid creating a new track.
-async function chooseVideoTrack(sequence,playhead,reserveSeconds){
+// Still imports may ignore source duration. Insert only on an empty/new track
+// so a temporary long still cannot overwrite unrelated clips before trimming.
+async function chooseVideoTrack(sequence){
   const count=await sequence.getVideoTrackCount();
-  const tracks=[];
   for(let i=count-1;i>=0;i--){
     const track=await sequence.getVideoTrack(i);
-    const clips=await track.getTrackItems(ppro.Constants.TrackItemType.CLIP,false);
-    tracks.push({index:i,clips});
-  }
-  const empty=tracks.find(t=>t.clips.length===0);
-  if(empty)return empty.index;
-  const start=playhead.seconds;
-  for(const t of tracks){
-    let available=true;
-    for(const clip of t.clips){
-      const a=(await clip.getStartTime()).seconds;
-      const b=(await clip.getEndTime()).seconds;
-      if(a<start+reserveSeconds && b>start){available=false;break;}
-    }
-    if(available)return t.index;
+    if((await track.getTrackItems(ppro.Constants.TrackItemType.CLIP,false)).length===0)return i;
   }
   return count;
 }
@@ -156,31 +141,34 @@ async function insertPlayer(p){
     if(!item)throw new Error('Süre sonrası PNG bulunamadı.');
     await verifyStillSourceDuration(ppro,item,durationTicks);
     const playhead=await sequence.getPlayerPosition();
-    const trackIndex=await chooseVideoTrack(sequence,playhead,Number(durationTicks)/254016000000);
+    const trackIndex=await chooseVideoTrack(sequence);
     const expectedSequence=sequence.guid.toString();
     const editor=ppro.SequenceEditor.getEditor(sequence);
+    const playheadTicks=playhead.ticks;
     let success=false;
     project.lockedAccess(()=>{success=project.executeTransaction(compound=>{
       compound.addAction(editor.createOverwriteItemAction(item,playhead,trackIndex,0));
     },'CS2 Player PNG Ekle');});
     if(!success)throw new Error('Timeline transaction başarısız.');
-    project=await ppro.Project.getActiveProject();
-    sequence=project&&await project.getActiveSequence();
-    if(!sequence||sequence.guid.toString()!==expectedSequence)throw new Error('PNG eklenirken aktif sequence değişti.');
-    const after=await effects.clips(sequence);
-    // Identify the new clip by track, start and source path, not wrapper identity.
-    const candidates=[];
-    for(const clip of after){
-      if(await clip.getTrackIndex()!==trackIndex)continue;
-      if((await clip.getStartTime()).ticks!==playhead.ticks)continue;
-      const source=ppro.ClipProjectItem.cast(await clip.getProjectItem());
-      if(source&&await source.getMediaFilePath()===path)candidates.push(clip);
+    async function resolveInserted(){
+      const freshProject=await ppro.Project.getActiveProject();
+      const freshSequence=freshProject&&await freshProject.getActiveSequence();
+      if(!freshSequence||freshSequence.guid.toString()!==expectedSequence)throw new Error('PNG eklenirken aktif sequence değişti.');
+      const track=await freshSequence.getVideoTrack(trackIndex);
+      const candidates=[];
+      for(const clip of await track.getTrackItems(ppro.Constants.TrackItemType.CLIP,false)){
+        if((await clip.getStartTime()).ticks!==playheadTicks)continue;
+        const source=ppro.ClipProjectItem.cast(await clip.getProjectItem());
+        if(source&&await source.getMediaFilePath()===path)candidates.push(clip);
+      }
+      if(candidates.length!==1)throw new Error('PNG eklendi fakat animasyon uygulanacak klip kesin olarak bulunamadı.');
+      return {project:freshProject,sequence:freshSequence,clip:candidates[0]};
     }
-    if(candidates.length!==1)throw new Error('PNG eklendi fakat animasyon uygulanacak klip kesin olarak bulunamadı.');
-    if(Number((await candidates[0].getDuration()).ticks)!==Number(durationTicks))throw new Error('PNG eklendi fakat timeline süresi hesaplanan kısa süre ile eşleşmedi.');
-    try{await effects.apply(project,sequence,candidates[0],p,true)}
+    const durationWarning=await fitInsertedStill(ppro,resolveInserted,durationTicks);
+    const fresh=await resolveInserted();
+    try{await effects.apply(fresh.project,fresh.sequence,fresh.clip,p,true)}
     catch(e){throw new Error('PNG timeline’da; efekt uygulanamadı: '+(e.message||e))}
-    status('✓ '+p.name+' giriş / çıkış animasyonuyla eklendi (V'+(trackIndex+1)+').');
+    status('✓ '+p.name+' giriş / çıkış animasyonuyla eklendi (V'+(trackIndex+1)+').'+(durationWarning?' '+durationWarning:''));
   }catch(e){console.error('CS2 Overlay insert',e);status('Ekleme hatası: '+(e.message||String(e)))}finally{inserting=false}
 }
 
