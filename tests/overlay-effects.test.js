@@ -241,3 +241,34 @@ test('applied motion blur matches the 360-degree shutter angle in both original 
   }
   assert.equal(effect.getParam(9).constant,false);
 });
+
+test('foreground insertion can pause an active scan instead of being rejected as busy',async()=>{
+  const f=fixture();let allowRead,entered;
+  const waiting=new Promise(r=>allowRead=r),started=new Promise(r=>entered=r);
+  let reads=0;
+  f.project.getActiveSequence=async()=>{reads++;entered();await waiting;return f.sequence};
+  const scan=f.effects.sync([player]);await started;
+  const reservation=f.effects.pauseTracking();
+  await f.effects.sync([player]);assert.equal(reads,1);
+  allowRead();await scan;
+  const resume=await reservation;
+  assert.equal(f.effects.isBusy(),false);assert.equal(f.state.transactions.length,0);
+  await f.effects.sync([player]);assert.equal(reads,1);
+  resume();resume(); // Releasing twice must not permit scans during a later pause.
+  await f.effects.sync([player]);assert.equal(reads,2);
+});
+test('a failed background scan releases pending foreground reservations',async()=>{
+  const f=fixture();let allowRead,entered;
+  const waiting=new Promise(r=>allowRead=r),started=new Promise(r=>entered=r);
+  f.project.getActiveSequence=async()=>{entered();await waiting;throw new Error('host read failed')};
+  const scan=f.effects.sync([player]);await started;
+  const reservation=f.effects.pauseTracking();allowRead();
+  await assert.rejects(scan,/host read failed/);
+  const resume=await reservation;assert.equal(f.effects.isBusy(),false);resume();
+});
+test('unmanaged timeline items do not incur geometry or locator reads during tracking',async()=>{
+  const f=fixture({tagged:false});
+  f.clip.getStartTime=async()=>{throw new Error('unmanaged clip geometry must not be read')};
+  await f.effects.sync([player]);await f.effects.sync([player]);
+  assert.equal(f.state.transactions.length,0);
+});

@@ -1,5 +1,5 @@
 const {entrypoints,storage}=require('uxp');
-let effectTimer=null;
+let effectTimer=null, effectTracking=false, effectTrackingGeneration=0;
 entrypoints.setup({panels:{playerPanel:{show(){startEffectTracking()},destroy(){stopEffectTracking();numericControls.forEach(c=>c.stop())}}}});
 const fs=storage.localFileSystem;
 const ppro=require('premierepro');
@@ -104,9 +104,12 @@ async function findImported(folder,path){
 }
 let inserting=false;
 async function insertPlayer(p){
-  if(inserting||effects.isBusy())return status('Önceki işlem sürüyor, tekrar dene.');inserting=true;
+  if(inserting)return status('Fotoğraf ekleme işlemi sürüyor.');
+  inserting=true;
+  let resumeTracking=()=>{};
   try{
     status(p.name+': PNG hazırlanıyor...');
+    resumeTracking=await effects.pauseTracking();
     let project=await ppro.Project.getActiveProject();if(!project)throw new Error('Aktif Premiere projesi yok.');
     let sequence=await project.getActiveSequence();if(!sequence)throw new Error('Aktif sequence yok.');
     const labelSequence=sequence.guid.toString();
@@ -165,27 +168,39 @@ async function insertPlayer(p){
     try{await effects.apply(fresh.project,fresh.sequence,fresh.clip,p,true)}
     catch(e){throw new Error('PNG timeline’da; efekt uygulanamadı: '+(e.message||e))}
     status('✓ '+p.name+' giriş / çıkış animasyonuyla eklendi (V'+(trackIndex+1)+').'+(durationWarning?' '+durationWarning:''));
-  }catch(e){console.error('CS2 Overlay insert',e);status('Ekleme hatası: '+(e.message||String(e)))}finally{inserting=false}
+  }catch(e){console.error('CS2 Overlay insert',e);status('Ekleme hatası: '+(e.message||String(e)))}finally{resumeTracking();inserting=false}
 }
 
 
-function stopEffectTracking(){if(effectTimer!==null)clearInterval(effectTimer);effectTimer=null}
+function stopEffectTracking(){
+  effectTracking=false;effectTrackingGeneration++;
+  if(effectTimer!==null)clearTimeout(effectTimer);
+  effectTimer=null;
+}
 function startEffectTracking(){
-  if(effectTimer!==null)return;
-  effectTimer=setInterval(async()=>{
-    if(inserting)return;
-    try{await effects.sync(players);effectError=''}
+  if(effectTracking)return;
+  effectTracking=true;
+  const generation=++effectTrackingGeneration;
+  async function tick(){
+    effectTimer=null;
+    if(!effectTracking||generation!==effectTrackingGeneration)return;
+    try{if(!inserting){await effects.sync(players);effectError=''}}
     catch(e){const message=e.message||String(e);if(message!==effectError){effectError=message;console.error('CS2 animation sync',e);status('Animasyon takibi: '+message)}}
-  },800);
+    finally{if(effectTracking&&generation===effectTrackingGeneration)effectTimer=setTimeout(tick,800)}
+  }
+  effectTimer=setTimeout(tick,800);
 }
 // The plugin must remain loaded to follow manual trims. Persisted clip tags
 // allow the next active-sequence scan to repair edits made while it was closed.
 startEffectTracking();
 $('applyEffects').onclick=async()=>{
-  if(inserting||effects.isBusy())return status('Önceki işlem sürüyor, tekrar dene.');
+  if(inserting)return status('Fotoğraf işlemi sürüyor.');
   inserting=true;
+  let resumeTracking=()=>{};
   let applied=0;const failures=[];
   try{
+    status('Efektler uygulanıyor...');
+    resumeTracking=await effects.pauseTracking();
     const project=await ppro.Project.getActiveProject();
     const sequence=project&&await project.getActiveSequence();
     if(!sequence)throw new Error('Aktif sequence yok.');
@@ -209,17 +224,20 @@ $('applyEffects').onclick=async()=>{
       catch(e){failures.push(name+': '+e.message)}
     }
     status(applied+' klibe giriş / çıkış efekti uygulandı.'+(failures.length?' Atlanan: '+failures.join(' | '):''));
-  }catch(e){status('Efekt hatası: '+e.message)}finally{inserting=false}
+  }catch(e){status('Efekt hatası: '+e.message)}finally{resumeTracking();inserting=false}
 };
 
 $('learnOrangeLabel').onclick=async()=>{
+  if(inserting)return status('Fotoğraf işlemi sürüyor.');
+  inserting=true;let resumeTracking=()=>{};
   try{
+    resumeTracking=await effects.pauseTracking();
     await labelSettingsReady;
     const project=await ppro.Project.getActiveProject();
     if(!project)throw new Error('Aktif Premiere projesi yok.');
     const index=await readSelectedLabel(ppro,project);
     await saveOrangeLabel(index);
     renderColorChoices();status('Orange label eşlemesi kaydedildi. Yeni eklediğin Orange oyuncular bu label ile eklenecek.');
-  }catch(e){status('Orange eşleme: '+e.message)}
+  }catch(e){status('Orange eşleme: '+e.message)}finally{resumeTracking();inserting=false}
 };
 labelSettingsReady.then(()=>{if(selected!==null)renderColorChoices()});

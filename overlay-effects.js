@@ -197,9 +197,10 @@ function createEffects(ppro) {
     }
   }
 
-  async function clips(sequence) {
+  async function clips(sequence, shouldStop = () => false) {
     const result = [];
     for (let i = 0; i < await sequence.getVideoTrackCount(); i++) {
+      if (shouldStop()) break;
       const track = await sequence.getVideoTrack(i);
       result.push(...await track.getTrackItems(ppro.Constants.TrackItemType.CLIP, false));
     }
@@ -209,38 +210,54 @@ function createEffects(ppro) {
   // Two stable observations avoid rewriting the animation throughout a drag.
   // Cache by wrapper only inside this scan; persistent ownership is in the
   // track item's name and therefore survives project/plugin reloads and copies.
-  let busy = false, context = '';
+  let busy = false, paused = 0, context = '';
+  const idleWaiters = [];
   const observed = new Map(), completed = new Map();
+  async function pauseTracking() {
+    paused++;
+    if (busy) await new Promise(resolve => idleWaiters.push(resolve));
+    let released = false;
+    return () => { if (!released) { released = true; paused--; } };
+  }
   async function sync(players) {
-    if (busy) return;
+    if (busy || paused) return;
     busy = true;
     try {
       const project = await ppro.Project.getActiveProject();
+      if (paused) return;
       const sequence = project && await project.getActiveSequence();
-      if (!sequence) return;
+      if (!sequence || paused) return;
       const currentContext = project.guid.toString() + ':' + sequence.guid.toString();
       if (currentContext !== context) {
         context = currentContext; observed.clear(); completed.clear();
       }
-      const seen = new Set(), failures = [];
-      let index = 0;
-      const pending = [];
-      for (const item of await clips(sequence)) {
-        pending.push({locator: await describe(item), name: await item.getName()});
-      }
-      const projectId = project.guid.toString(), sequenceId = sequence.guid.toString();
-      for (const {locator, name} of pending) {
-        const key = index++;
-        const id = playerId(name);
-        const player = players.find(p => p.id === id);
+      const seen = new Set(), failures = [], pending = [];
+      const byId = new Map(players.map(player => [player.id, player]));
+      // Snapshot only managed clips before making any edits. Avoid rescanning a
+      // whole track separately for every unchanged overlay on a large timeline.
+      for (const item of await clips(sequence, () => paused > 0)) {
+        if (paused) return;
+        const name = await item.getName();
+        const id = playerId(name), player = byId.get(id);
         if (!player) continue;
+        try {
+          const locator = await describe(item);
+          if (paused) return;
+          const g = await geometry(sequence, item);
+          pending.push({locator, player, signature: JSON.stringify([player, g.signature])});
+        } catch (e) { failures.push(player.name + ': ' + e.message); }
+      }
+      if (paused) return;
+      const projectId = project.guid.toString(), sequenceId = sequence.guid.toString();
+      for (const {locator, player, signature} of pending) {
+        if (paused) return;
+        const key = locator.track + ':' + locator.start + ':' + player.id;
         seen.add(key);
+        if (completed.get(key) === signature) continue;
+        if (observed.get(key) !== signature) { observed.set(key, signature); continue; }
         try {
           const fresh = await resolve(projectId, sequenceId, locator);
-          const g = await geometry(fresh.sequence, fresh.clip);
-          const signature = JSON.stringify([player, g.signature]);
-          if (completed.get(key) === signature) continue;
-          if (observed.get(key) !== signature) { observed.set(key, signature); continue; }
+          if (paused) return;
           await apply(fresh.project, fresh.sequence, locator, player);
           completed.set(key, signature);
         } catch (e) { failures.push(player.name + ': ' + e.message); }
@@ -249,9 +266,12 @@ function createEffects(ppro) {
         if (!seen.has(key)) { observed.delete(key); completed.delete(key); }
       }
       if (failures.length) throw new Error(failures.join(' | '));
-    } finally { busy = false; }
+    } finally {
+      busy = false;
+      idleWaiters.splice(0).forEach(resolve => resolve());
+    }
   }
-  return {apply, clips, describe, sync, isBusy: () => busy};
+  return {apply, clips, describe, sync, pauseTracking, isBusy: () => busy};
 }
 
 module.exports = {animationKeys, playerId, clipName, createEffects, IN_SECONDS, OUT_SECONDS};

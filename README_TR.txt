@@ -1,25 +1,32 @@
-CS2 Player Overlay v1.3.11 — Premiere Pro 25.6+ / UXP
+CS2 Player Overlay v1.3.12 — Premiere Pro 25.6+ / UXP
 
 Kurulum
 - Bu klasördeki manifest.json dosyasını UXP Developer Tool ile ekleyip Load/Reload yapın.
 - ZIP içindeki tüm JavaScript dosyaları (player-defaults.js dahil), manifest.json ile aynı klasörde bulunmalı.
 - Eklenti kimliği değişmediği için mevcut oyuncu kütüphanesi korunur.
 
-Süre kontrolü düzeltmesi (v1.3.11)
+İşlem önceliği (v1.3.12)
+- Arka plan taraması sürüyor diye fotoğraf ekleme isteği reddedilmez.
+- Fotoğraf ekleme/efekt uygulama/Orange eşleştirme önce taramayı duraklatır;
+  mevcut native adım bitince ön plandaki işlem başlar. finally bloğu takibi yeniden açar.
+- Yeni tarama önceki tarama bittikten 800 ms sonra başlar; interval birikmesi yoktur.
+- Takip yalnızca CS2 işaretli oyuncuların konum/süre bilgilerini okur.
+
+Süre kontrolü düzeltmesi (v1.3.12)
 - getDuration() uyuşmazlığında ayarları ve animasyonu engelleyen kontrol kaldırıldı.
 - Yeni klipte timeline end-start ve kaynak out-in kontrol edilir; gerekirse yalnızca
   yeni klibin out/end noktaları düzeltilir. Her mutation sonrası native referanslar yenilenir.
 - Kaynak PNG süresi eklemeden önce doğrulanır; yer seçimi bu kesin süreyi kullanır.
 - Süre düzeltmesi reddedilirse animasyon/ölçüler yine uygulanır; panelde süre uyarısı gösterilir.
 
-Fotoğraf süresi (v1.3.11)
+Fotoğraf süresi (v1.3.12)
 - Çıkış süresi 60 fps'de 45 kareye (0,75 sn) indirildi. Giriş ~0,748 sn olarak korundu.
 - Yeni klip uzunluğu iki animasyonu hızlandırmadan sığdıran en kısa tam kare sayısıdır:
   60 fps'de 91 kare, yani 00:00:01:31. Diğer fps'lerde sekans timebase'iyle hesaplanır.
 - Kaynak in/out işaretleri eklemeden önce ayarlanıp doğrulanır; boş track/aralık
   seçimi mevcut klipleri korur. Eski timeline kliplerinin süreleri değiştirilmez.
 
-Track yerleşimi (v1.3.11)
+Track yerleşimi (v1.3.12)
 - Oynatma imlecinden başlayarak fotoğrafın hesaplanan tam süresini sığdıran boşluklar aranır.
 - Logo.png bulunan en üst track alt sınırdır: logo V5'teyse V6, V7, V8... taranır.
   Fotoğrafın tamamının sığdığı ilk track seçilir; logoya ve altına eklenmez.
@@ -29,22 +36,22 @@ Track yerleşimi (v1.3.11)
 - Önceki klibin bitişiyle veya sonraki klibin başlangıcıyla tam temas çakışma sayılmaz.
 - Kaynak in/out ayarlanıp doğrulanmadan overwrite yapılmaz; animasyon/süre aynı kalır.
 
-Varsayılanlar (v1.3.11)
+Varsayılanlar (v1.3.12)
 - Yeni oyuncular: Scale 81, X 8000, Y 2400, Rotation -27, Opacity 100, Kayma mesafesi 50.
 - Kayıtlı özel oyuncu değerleri değiştirilmez. Ayarlardaki Varsayılan düğmesi de bu değerleri yükler.
 
-Animasyon (v1.3.11)
+Animasyon (v1.3.12)
 - Giriş hızlı başlar, giderek yavaşlar (quartic ease-out); yolun %90’dan fazlası
   sürenin ilk yarısında alınır. Çıkışın ease-in/out eğrisi korunur.
 - Temporal Interpolation, LINEAR yerine native BEZIER olarak uygulanır.
-- v1.3.11: Giriş süresi 44/50 oranına indirildi (%12 daha kısa, ~0,748 sn).
+- v1.3.12: Giriş süresi 44/50 oranına indirildi (%12 daha kısa, ~0,748 sn).
   Başlangıç/varış konumları, kayma mesafesi ve çıkış süresi 0,75 sn olarak güncellendi.
 - Hareket bulanıklığı: Transform shutter angle 360°, composition shutter kapalı.
 - API özel Bézier tutamaçlarını sunmadığı için eğri kare başına örneklenir;
   native Temporal Bézier modu gerçekten uygulanır. Özel Ease In/Out tutamaçları
   ve Spatial Auto Bézier bayrakları API'de bulunmadığından birebir menü kopyası değildir.
 
-Orange label düzeltmesi (v1.3.11)
+Orange label düzeltmesi (v1.3.12)
 - Orange artık otomatik Mango yuvasına atanmaz.
 - Oyuncu ayarlarında Orange seçin. Premiere Project panelinde herhangi bir öğeye
   istediğiniz Orange label'ını verin ve yalnızca o öğeyi seçin (timeline değil).
@@ -85,7 +92,7 @@ Kullanım
   panel tekrar açılınca ve ilgili sequence aktif olunca düzeltilir.
 - Takip işareti klibin adındaki [CS2:...] ekidir. Otomatik takip için bu eki koruyun.
   Yönetilen ilk Transform efektini elle sıralamayın/değiştirmeyin; takip bu efekti yönetir.
-- v1.3.11: Kayma mesafesi (%) ayarı eklendi. Varsayılan 50: eski mesafenin yarısı.
+- v1.3.12: Kayma mesafesi (%) ayarı eklendi. Varsayılan 50: eski mesafenin yarısı.
   25 daha kısa, 100 orijinal mesafe, 0 hareketsizdir. Hem giriş hem çıkışa uygulanır.
   Position X fotoğrafın durduğu yeri belirler; kayma mesafesi bu konumu değiştirmez.
 - Önceki denemelerdeki süre kısaltmaları geri alındı. Giriş ~0,748 sn, çıkış 0,75 sn.
@@ -101,7 +108,7 @@ Preset ayrıntısı ve sınırlar
 - .prfpset doğrudan import edilmez. Geometry2/Transform API ile yeniden oluşturulur.
   UXP özel temporal/spatial Bézier tutamaçlarını sunmadığı için yumuşama kare başına
   örneklenen smoothstep yaklaşımıdır; preset eğrilerinin birebir kopyası değildir.
-- Burada Premiere host bulunmuyor. 18 Node testi zamanlama, kırpma, kısa klip, eski
+- Burada Premiere host bulunmuyor. 21 Node testi zamanlama, kırpma, kısa klip, eski
   keyframe temizliği, efekt işlemleri ve otomatik takibi API taklitleriyle doğrular.
   Gerçek Premiere API davranışı ve render görüntüsü masaüstünde denenmelidir.
 
