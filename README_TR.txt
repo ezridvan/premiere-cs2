@@ -1,4 +1,4 @@
-CS2 Player Overlay v1.0 — Premiere Pro 25.6+ / UXP
+CS2 Player Overlay v1.0.1 — Premiere Pro 25.6+ / UXP
 
 Kurulum
 - Bu klasördeki manifest.json dosyasını UXP Developer Tool ile ekleyip Load/Reload yapın.
@@ -27,7 +27,7 @@ Preset ayrıntısı ve sınırlar
 - .prfpset doğrudan import edilmez. Geometry2/Transform API ile yeniden oluşturulur.
   UXP özel temporal/spatial Bézier tutamaçlarını sunmadığı için yumuşama kare başına
   örneklenen smoothstep yaklaşımıdır; preset eğrilerinin birebir kopyası değildir.
-- Burada Premiere host bulunmuyor. 9 Node testi zamanlama, kırpma, kısa klip, eski
+- Burada Premiere host bulunmuyor. 11 Node testi zamanlama, kırpma, kısa klip, eski
   keyframe temizliği, efekt işlemleri ve otomatik takibi API taklitleriyle doğrular.
   Gerçek Premiere API davranışı ve render görüntüsü masaüstünde denenmelidir.
 

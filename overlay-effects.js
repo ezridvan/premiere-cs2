@@ -40,10 +40,10 @@ function animationKeys(inPoint, outPoint, frameSeconds, player, size) {
 }
 
 function createEffects(ppro) {
-  function transact(project, title, actions) {
+  function transact(project, title, buildActions) {
     let ok = false;
     project.lockedAccess(() => {
-      ok = project.executeTransaction(c => actions.forEach(a => c.addAction(a)), title);
+      ok = project.executeTransaction(c => buildActions().forEach(a => c.addAction(a)), title);
     });
     if (!ok) throw new Error(title + ' başarısız.');
   }
@@ -71,49 +71,118 @@ function createEffects(ppro) {
     return null;
   }
 
+  async function describe(clip) {
+    return {cs2Locator: true, track: await clip.getTrackIndex(),
+      start: (await clip.getStartTime()).ticks};
+  }
+
+  async function resolve(projectId, sequenceId, locator) {
+    const project = await ppro.Project.getActiveProject();
+    if (!project || project.guid.toString() !== projectId) throw new Error('Aktif proje değişti.');
+    const sequence = await project.getSequence(ppro.Guid.fromString(sequenceId));
+    if (!sequence) throw new Error('Sequence bulunamadı.');
+    const track = await sequence.getVideoTrack(locator.track);
+    const items = await track.getTrackItems(ppro.Constants.TrackItemType.CLIP, false);
+    const matches = [];
+    for (const item of items) {
+      if ((await item.getStartTime()).ticks === locator.start) matches.push(item);
+    }
+    if (matches.length !== 1) throw new Error('Klip taşındı veya silindi; yeniden dene.');
+    return {project, sequence, clip: matches[0]};
+  }
+
   async function apply(project, sequence, clip, player, adopt = false) {
+    const projectId = project.guid.toString(), sequenceId = sequence.guid.toString();
+    const locator = clip.cs2Locator ? clip : await describe(clip);
+    let chain, effect, position;
+    async function refresh() {
+      const fresh = await resolve(projectId, sequenceId, locator);
+      project = fresh.project; sequence = fresh.sequence; clip = fresh.clip;
+      chain = await clip.getComponentChain();
+      effect = await findTransform(clip);
+      position = effect && effect.getParam(1);
+    }
+    await refresh();
     const g = await geometry(sequence, clip);
     const keys = animationKeys(g.input.seconds, g.output.seconds, g.frame, player, g.size);
-    const chain = await clip.getComponentChain();
-    let effect = await findTransform(clip);
     // Adoption must not take ownership of a user's existing Transform.
     if (adopt && effect && !playerId(await clip.getName())) {
       throw new Error('Klipte zaten Transform var; mevcut efekti korumak için atlandı.');
     }
+    let appended = false;
     if (!effect) {
       effect = await ppro.VideoFilterFactory.createComponent(MATCH);
-      transact(project, 'CS2 Transform ekle', [chain.createAppendComponentAction(effect)]);
-      effect = await findTransform(clip);
+      transact(project, 'CS2 Transform ekle', () => [chain.createAppendComponentAction(effect)]);
+      appended = true;
     }
+    let phase = 'Transform sonrası klibi yenile';
+    try {
+    await refresh();
     if (!effect || effect.getParamCount() < 11) throw new Error('Transform parametreleri bulunamadı.');
-    const position = effect.getParam(1);
+    position = effect.getParam(1);
     if (!await position.areKeyframesSupported()) throw new Error('Position keyframe desteklemiyor.');
-    const actions = [];
-    // Param indexes are the ordered Params array of the supplied Geometry2
-    // preset, not localized display names or ParameterID values.
+    // Commit modes before constructing actions that depend on those modes.
+    // Native Premiere validates keyframe existence when interpolation actions
+    // are created, not only when the transaction eventually executes.
     const constants = [[0, new ppro.PointF(.5, .5)], [2, true],
       [3, player.scale], [4, player.scale], [5, 0], [6, 0],
       [7, player.rotation], [8, player.opacity], [9, false], [10, 360]];
-    for (const [index, value] of constants) {
-      const param = effect.getParam(index);
-      actions.push(param.createSetTimeVaryingAction(false));
-      actions.push(param.createSetValueAction(param.createKeyframe(value), true));
+    phase = 'Animasyon kanallarını hazırla';
+    transact(project, 'CS2 animasyon kanallarını hazırla', () => {
+      const actions = [];
+      for (const time of position.getKeyframeListAsTickTimes()) {
+        actions.push(position.createRemoveKeyframeAction(time, true));
+      }
+      for (const [index] of constants) {
+        actions.push(effect.getParam(index).createSetTimeVaryingAction(false));
+      }
+      actions.push(position.createSetTimeVaryingAction(true));
+      return actions;
+    });
+    phase = 'Keyframe eklemek için referansları yenile';
+    await refresh();
+    phase = 'Giriş / çıkış keyframe ekle';
+    transact(project, 'CS2 giriş / çıkış keyframe ekle', () => {
+      const actions = [];
+      for (const [index, value] of constants) {
+        const param = effect.getParam(index);
+        actions.push(param.createSetValueAction(param.createKeyframe(value), true));
+      }
+      for (const key of keys) {
+        const k = position.createKeyframe(new ppro.PointF(key.x, key.y));
+        k.position = ppro.TickTime.createWithSeconds(key.time);
+        actions.push(position.createAddKeyframeAction(k));
+      }
+      return actions;
+    });
+    phase = 'Eğri için referansları yenile';
+    await refresh();
+    phase = 'Animasyon eğrisini ayarla';
+    transact(project, 'CS2 animasyon eğrisini ayarla', () => {
+      const actions = keys.map(key => position.createSetInterpolationAtKeyframeAction(
+        ppro.TickTime.createWithSeconds(key.time), ppro.Constants.InterpolationMode.LINEAR, true));
+      actions.push(clip.createSetNameAction(clipName(player)));
+      return actions;
+    });
+    phase = 'Keyframe sonucunu doğrula';
+    await refresh();
+    const actual = position.getKeyframeListAsTickTimes();
+    if (actual.length !== keys.length) {
+      throw new Error('Keyframe doğrulaması başarısız: beklenen ' + keys.length + ', bulunan ' + actual.length);
     }
-    // Remove ALL old keys, including keys now outside the trimmed range.
-    for (const time of position.getKeyframeListAsTickTimes()) {
-      actions.push(position.createRemoveKeyframeAction(time, true));
-    }
-    actions.push(position.createSetTimeVaryingAction(true));
-    for (const key of keys) {
-      const k = position.createKeyframe(new ppro.PointF(key.x, key.y));
-      k.position = ppro.TickTime.createWithSeconds(key.time);
-      actions.push(position.createAddKeyframeAction(k));
-      actions.push(position.createSetInterpolationAtKeyframeAction(
-        k.position, ppro.Constants.InterpolationMode.LINEAR, true));
-    }
-    actions.push(clip.createSetNameAction(clipName(player)));
-    transact(project, 'CS2 giriş / çıkış animasyonunu güncelle', actions);
     return g.signature;
+    } catch (error) {
+      // Never leave an unowned partial Transform behind after a failed setup;
+      // otherwise a retry would mistake our own leftover for a user effect.
+      if (appended && effect) {
+        try { await refresh(); transact(project, 'CS2 eksik efekti temizle',
+          () => [chain.createRemoveComponentAction(effect)]); }
+        catch (cleanupError) {
+          throw new Error(error.message + ' | Eksik Transform temizlenemedi: ' + cleanupError.message);
+        }
+      }
+      throw new Error(phase + ': ' + error.message);
+    }
   }
 
   async function clips(sequence) {
@@ -143,18 +212,24 @@ function createEffects(ppro) {
       }
       const seen = new Set(), failures = [];
       let index = 0;
-      for (const clip of await clips(sequence)) {
+      const pending = [];
+      for (const item of await clips(sequence)) {
+        pending.push({locator: await describe(item), name: await item.getName()});
+      }
+      const projectId = project.guid.toString(), sequenceId = sequence.guid.toString();
+      for (const {locator, name} of pending) {
         const key = index++;
-        const id = playerId(await clip.getName());
+        const id = playerId(name);
         const player = players.find(p => p.id === id);
         if (!player) continue;
         seen.add(key);
         try {
-          const g = await geometry(sequence, clip);
+          const fresh = await resolve(projectId, sequenceId, locator);
+          const g = await geometry(fresh.sequence, fresh.clip);
           const signature = JSON.stringify([player, g.signature]);
           if (completed.get(key) === signature) continue;
           if (observed.get(key) !== signature) { observed.set(key, signature); continue; }
-          await apply(project, sequence, clip, player);
+          await apply(fresh.project, fresh.sequence, locator, player);
           completed.set(key, signature);
         } catch (e) { failures.push(player.name + ': ' + e.message); }
       }
@@ -164,7 +239,7 @@ function createEffects(ppro) {
       if (failures.length) throw new Error(failures.join(' | '));
     } finally { busy = false; }
   }
-  return {apply, clips, sync, isBusy: () => busy};
+  return {apply, clips, describe, sync, isBusy: () => busy};
 }
 
 module.exports = {animationKeys, playerId, clipName, createEffects, IN_SECONDS, OUT_SECONDS};

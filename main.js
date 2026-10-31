@@ -83,19 +83,23 @@ async function insertPlayer(p){
   if(inserting||effects.isBusy())return status('Önceki işlem sürüyor, tekrar dene.');inserting=true;
   try{
     status(p.name+': PNG hazırlanıyor...');
-    const project=await ppro.Project.getActiveProject();if(!project)throw new Error('Aktif Premiere projesi yok.');
-    const sequence=await project.getActiveSequence();if(!sequence)throw new Error('Aktif sequence yok.');
+    let project=await ppro.Project.getActiveProject();if(!project)throw new Error('Aktif Premiere projesi yok.');
+    let sequence=await project.getActiveSequence();if(!sequence)throw new Error('Aktif sequence yok.');
     const path=await ensurePlayerFile(p);const root=await project.getRootItem();
     let item=await findImported(root,path);
     if(!item){status(p.name+': Projeye import ediliyor...');const ok=await project.importFiles([path],true,root,false);if(!ok)throw new Error('PNG import başarısız.');item=await findImported(root,path)}
     if(!item)throw new Error('PNG import edildi ama ProjectItem bulunamadı.');
     const playhead=await sequence.getPlayerPosition();const trackIndex=await chooseVideoTrack(sequence,playhead);
+    const expectedSequence=sequence.guid.toString();
     const editor=ppro.SequenceEditor.getEditor(sequence);
     let success=false;
     project.lockedAccess(()=>{success=project.executeTransaction(compound=>{
       compound.addAction(editor.createOverwriteItemAction(item,playhead,trackIndex,0));
     },'CS2 Player PNG Ekle');});
     if(!success)throw new Error('Timeline transaction başarısız.');
+    project=await ppro.Project.getActiveProject();
+    sequence=project&&await project.getActiveSequence();
+    if(!sequence||sequence.guid.toString()!==expectedSequence)throw new Error('PNG eklenirken aktif sequence değişti.');
     const after=await effects.clips(sequence);
     // Identify the new clip by track, start and source path, not wrapper identity.
     const candidates=[];
@@ -133,14 +137,24 @@ $('applyEffects').onclick=async()=>{
     const project=await ppro.Project.getActiveProject();
     const sequence=project&&await project.getActiveSequence();
     if(!sequence)throw new Error('Aktif sequence yok.');
+    const sequenceId=sequence.guid.toString();
     const paths=new Map();
     for(const player of players){try{paths.set(await ensurePlayerFile(player),player)}catch(e){failures.push(player.name+': '+e.message)}}
+    const pending=[];
     for(const clip of await effects.clips(sequence)){
       const source=ppro.ClipProjectItem.cast(await clip.getProjectItem());
       const player=source&&paths.get(await source.getMediaFilePath());
       if(!player)continue;
-      try{await effects.apply(project,sequence,clip,player,true);applied++}
-      catch(e){failures.push((await clip.getName())+': '+e.message)}
+      pending.push({locator:await effects.describe(clip),player,name:await clip.getName()});
+    }
+    for(const {locator,player,name} of pending){
+      try{
+        const freshProject=await ppro.Project.getActiveProject();
+        const freshSequence=freshProject&&await freshProject.getSequence(ppro.Guid.fromString(sequenceId));
+        if(!freshSequence)throw new Error('Sequence artık açık değil.');
+        await effects.apply(freshProject,freshSequence,locator,player,true);applied++
+      }
+      catch(e){failures.push(name+': '+e.message)}
     }
     status(applied+' klibe giriş / çıkış efekti uygulandı.'+(failures.length?' Atlanan: '+failures.join(' | '):''));
   }catch(e){status('Efekt hatası: '+e.message)}finally{inserting=false}
