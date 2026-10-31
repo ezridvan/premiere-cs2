@@ -1,7 +1,11 @@
 const {entrypoints,storage}=require('uxp');
-entrypoints.setup({panels:{playerPanel:{show(){}}}});
+let effectTimer=null;
+entrypoints.setup({panels:{playerPanel:{show(){startEffectTracking()},destroy(){stopEffectTracking()}}}});
 const fs=storage.localFileSystem;
 const ppro=require('premierepro');
+const {createEffects}=require('./overlay-effects.js');
+const effects=createEffects(ppro);
+let effectError='';
 const $=id=>document.getElementById(id);
 let players=[],selected=null,tab='favorites';
 const defaults={scale:100,x:960,y:540,rotation:0,opacity:100};
@@ -26,7 +30,7 @@ players.push(p);await saveDB();showSettings(false);render();status(name+' eklend
 makeFields();loadDB().catch(e=>status('Başlatma hatası: '+e.message));
 
 // Timeline prototype: import PNG and reuse the highest safe video track.
-// Effects are intentionally NOT claimed to work in this build.
+// The dedicated Transform is managed by overlay-effects.js.
 async function storePNG(id,bytes){
   const dir=await fs.getDataFolder();const file=await dir.createFile('player_'+id+'.png',{overwrite:true});
   await file.write(bytes,{format:storage.formats.binary});return file.name;
@@ -76,7 +80,7 @@ async function chooseVideoTrack(sequence,playhead){
 }
 let inserting=false;
 async function insertPlayer(p){
-  if(inserting)return status('Önceki ekleme sürüyor...');inserting=true;
+  if(inserting||effects.isBusy())return status('Önceki işlem sürüyor, tekrar dene.');inserting=true;
   try{
     status(p.name+': PNG hazırlanıyor...');
     const project=await ppro.Project.getActiveProject();if(!project)throw new Error('Aktif Premiere projesi yok.');
@@ -92,6 +96,52 @@ async function insertPlayer(p){
       compound.addAction(editor.createOverwriteItemAction(item,playhead,trackIndex,0));
     },'CS2 Player PNG Ekle');});
     if(!success)throw new Error('Timeline transaction başarısız.');
-    status('✓ '+p.name+' timeline’a eklendi (V'+(trackIndex+1)+'). Efektler henüz uygulanmadı.');
+    const after=await effects.clips(sequence);
+    // Identify the new clip by track, start and source path, not wrapper identity.
+    const candidates=[];
+    for(const clip of after){
+      if(await clip.getTrackIndex()!==trackIndex)continue;
+      if((await clip.getStartTime()).ticks!==playhead.ticks)continue;
+      const source=ppro.ClipProjectItem.cast(await clip.getProjectItem());
+      if(source&&await source.getMediaFilePath()===path)candidates.push(clip);
+    }
+    if(candidates.length!==1)throw new Error('PNG eklendi fakat animasyon uygulanacak klip kesin olarak bulunamadı.');
+    try{await effects.apply(project,sequence,candidates[0],p,true)}
+    catch(e){throw new Error('PNG timeline’da; efekt uygulanamadı: '+(e.message||e))}
+    status('✓ '+p.name+' giriş / çıkış animasyonuyla eklendi (V'+(trackIndex+1)+').');
   }catch(e){console.error('CS2 Overlay insert',e);status('Ekleme hatası: '+(e.message||String(e)))}finally{inserting=false}
 }
+
+
+function stopEffectTracking(){if(effectTimer!==null)clearInterval(effectTimer);effectTimer=null}
+function startEffectTracking(){
+  if(effectTimer!==null)return;
+  effectTimer=setInterval(async()=>{
+    if(inserting)return;
+    try{await effects.sync(players);effectError=''}
+    catch(e){const message=e.message||String(e);if(message!==effectError){effectError=message;console.error('CS2 animation sync',e);status('Animasyon takibi: '+message)}}
+  },800);
+}
+// The plugin must remain loaded to follow manual trims. Persisted clip tags
+// allow the next active-sequence scan to repair edits made while it was closed.
+startEffectTracking();
+$('applyEffects').onclick=async()=>{
+  if(inserting||effects.isBusy())return status('Önceki işlem sürüyor, tekrar dene.');
+  inserting=true;
+  let applied=0;const failures=[];
+  try{
+    const project=await ppro.Project.getActiveProject();
+    const sequence=project&&await project.getActiveSequence();
+    if(!sequence)throw new Error('Aktif sequence yok.');
+    const paths=new Map();
+    for(const player of players){try{paths.set(await ensurePlayerFile(player),player)}catch(e){failures.push(player.name+': '+e.message)}}
+    for(const clip of await effects.clips(sequence)){
+      const source=ppro.ClipProjectItem.cast(await clip.getProjectItem());
+      const player=source&&paths.get(await source.getMediaFilePath());
+      if(!player)continue;
+      try{await effects.apply(project,sequence,clip,player,true);applied++}
+      catch(e){failures.push((await clip.getName())+': '+e.message)}
+    }
+    status(applied+' klibe giriş / çıkış efekti uygulandı.'+(failures.length?' Atlanan: '+failures.join(' | '):''));
+  }catch(e){status('Efekt hatası: '+e.message)}finally{inserting=false}
+};

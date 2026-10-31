@@ -1,1 +1,5 @@
-v0.7 arayuz duzeltmesi: Kart butonlari ust uste binmez, arama sp-textfield ile yapilir. Premiere timeline/animasyon API entegrasyonu henuz yoktur. Onceki oyuncu verileri korunur.
+CS2 Player Overlay v1.0. Premiere Pro 25.6+ UXP panel.
+Load manifest.json with UXP Developer Tool. Keep overlay-effects.js beside main.js.
+See README_TR.txt for usage, trim-following limitations and desktop verification.
+No external dependencies. Run checks with Node: node --check main.js;
+node --check overlay-effects.js; node tests/overlay-effects.test.js
